@@ -1,0 +1,515 @@
+{
+  "requirements": [
+    {
+      "id": "BR-001",
+      "description": "The system must allow an authenticated user to create a TODO. The create flow captures title, description, priority and due date, with optional assignment to a user, and then saves the TODO.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-009",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-002",
+      "description": "Each TODO must contain title, description, status, priority and due date. Optional notes can also be added (in scope). A title is mandatory.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-005",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "id": "BR-003",
+      "description": "Users must be able to edit TODOs they own or are authorized to manage. Editable information includes details, status, priority and due date, and reassignment where authorized.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-010"
+      ]
+    },
+    {
+      "id": "BR-004",
+      "description": "Users must be able to mark TODOs as completed. A completed TODO must have Completed status.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-012",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-005",
+      "description": "Users must be able to assign a TODO to another authorized user, at creation (optional) or by reassignment where authorized. Team Leads can create and assign TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-009",
+        "XATA_TODO_BRD-010",
+        "XATA_TODO_BRD-007"
+      ]
+    },
+    {
+      "id": "BR-006",
+      "description": "The system must support exactly the statuses Open, In Progress and Completed for TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "id": "BR-007",
+      "description": "The system must support the priorities Low, Medium, High and Critical for TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "id": "BR-008",
+      "description": "Users must be able to filter TODOs by status, priority, assignee and due date.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-009",
+      "description": "Users should be able to search TODOs by title or description.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-010",
+      "description": "The dashboard must show Open, In Progress, Completed and Overdue TODO counts. The dashboard section also lists High/Critical priority TODOs. Overdue means the due date has passed and status is not Completed.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-011",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "id": "BR-011",
+      "description": "Team Leads must be able to view TODOs assigned to their team members (basic team view). This supports monitoring overdue work.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-007",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-012",
+      "description": "The system must maintain created-by, created-date, updated-by and updated-date for TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "id": "BR-013",
+      "description": "Users should be able to delete TODOs where permitted. Deleting a TODO must not delete the user account or other TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-010",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "id": "BR-014",
+      "description": "The system must prevent unauthorized modification of another user's TODO. Only authorized users can assign or modify TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-012",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "id": "BR-015",
+      "description": "The system must provide a web interface through supported browsers. The first release is web-based only, and there are no native mobile apps.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-013",
+        "XATA_TODO_BRD-006"
+      ]
+    }
+  ],
+  "business_rules": [
+    {
+      "text": "A TODO must have a title.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "text": "A due date cannot be earlier than the creation date unless explicitly permitted.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "text": "Completed TODOs must have Completed status.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "text": "Only authorized users can assign or modify TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "text": "Overdue means the due date has passed and the status is not Completed.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "text": "Deleting a TODO must not delete the user account or other TODOs.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    }
+  ],
+  "workflows": [
+    {
+      "name": "Create TODO",
+      "steps": [
+        "Authenticated user opens the create TODO form",
+        "Enter title",
+        "Enter description",
+        "Select priority",
+        "Select due date",
+        "Optionally assign to a user",
+        "Save the TODO"
+      ],
+      "citations": [
+        "XATA_TODO_BRD-009",
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "name": "Manage TODO",
+      "steps": [
+        "View details",
+        "Edit information",
+        "Change status",
+        "Change priority or due date",
+        "Reassign where authorized",
+        "Delete where authorized"
+      ],
+      "citations": [
+        "XATA_TODO_BRD-010"
+      ]
+    },
+    {
+      "name": "View dashboard",
+      "steps": [
+        "User opens the dashboard",
+        "System shows total open TODOs",
+        "System shows in-progress TODOs",
+        "System shows completed TODOs",
+        "System shows overdue TODOs",
+        "System shows High/Critical priority TODOs"
+      ],
+      "citations": [
+        "XATA_TODO_BRD-011",
+        "XATA_TODO_BRD-008-B"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "requirement_ids": [
+        "BR-001",
+        "BR-002"
+      ],
+      "given": "An authenticated user is on the create TODO form",
+      "when": "They enter a title, description, priority and due date and save",
+      "then": "A TODO is created containing title, description, status, priority and due date",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-009",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-002"
+      ],
+      "given": "A user is creating a TODO",
+      "when": "They try to save without a title",
+      "then": "The system does not save the TODO because a title is required",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-003"
+      ],
+      "given": "A user owns a TODO or is authorized to manage it",
+      "when": "They edit its information and save",
+      "then": "The changes are persisted",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-004"
+      ],
+      "given": "A user can manage an Open or In Progress TODO",
+      "when": "They mark it as completed",
+      "then": "Its status becomes Completed",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-005"
+      ],
+      "given": "A user is authorized to assign TODOs",
+      "when": "They assign a TODO to another authorized user",
+      "then": "The TODO shows that user as assignee",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-006"
+      ],
+      "given": "A user creates or edits a TODO",
+      "when": "They select a status",
+      "then": "The options available are Open, In Progress and Completed",
+      "citations": [
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-007"
+      ],
+      "given": "A user creates or edits a TODO",
+      "when": "They select a priority",
+      "then": "The options available are Low, Medium, High and Critical",
+      "citations": [
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-008"
+      ],
+      "given": "Several TODOs exist with differing status, priority, assignee and due date",
+      "when": "A user applies a filter on any of these fields",
+      "then": "Only the matching TODOs are returned",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-010"
+      ],
+      "given": "TODOs exist in various states, including some past their due date and not Completed",
+      "when": "A user views the dashboard",
+      "then": "Open, In Progress, Completed and Overdue counts correctly reflect the TODO state",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-012",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-011"
+      ],
+      "given": "A Team Lead has team members with assigned TODOs",
+      "when": "The Team Lead opens the team view",
+      "then": "The TODOs assigned to their team members are shown",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-007"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-012"
+      ],
+      "given": "A TODO is created and later updated by different users",
+      "when": "The audit information is viewed",
+      "then": "Created-by, created-date, updated-by and updated-date reflect the actions performed",
+      "citations": [
+        "XATA_TODO_BRD-008-B"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-014"
+      ],
+      "given": "A TODO belongs to another user and the current user is not authorized to manage it",
+      "when": "The user attempts to modify, assign or delete it",
+      "then": "The system prevents the modification",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-012",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-015"
+      ],
+      "given": "A user has a supported browser",
+      "when": "They access the application",
+      "then": "The web interface is available and the core TODO functions can be used",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-013"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-009"
+      ],
+      "given": "TODOs exist with various titles and descriptions",
+      "when": "A user searches for a term",
+      "then": "TODOs whose title or description match are returned",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-014"
+      ]
+    },
+    {
+      "requirement_ids": [
+        "BR-013"
+      ],
+      "given": "A user is permitted to delete a TODO",
+      "when": "They delete it",
+      "then": "The TODO is removed, and the user account and other TODOs are unaffected",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-012"
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "What does 'authorized to manage' mean for each role (Employee, Team Lead, Administrator)? Who may edit, assign, reassign or delete which TODOs?",
+      "why_it_matters": "BR-003, BR-005, BR-013 and BR-014 depend on an authorization model that the BRD does not define.",
+      "citations": [
+        "XATA_TODO_BRD-007",
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "question": "Who counts as an 'authorized user' to be assigned a TODO? Can an Employee assign TODOs to others, or only Team Leads?",
+      "why_it_matters": "The roles table gives assignment only to Team Leads, while BR-005 says 'users'.",
+      "citations": [
+        "XATA_TODO_BRD-007",
+        "XATA_TODO_BRD-008-A"
+      ]
+    },
+    {
+      "question": "When may a due date earlier than the creation date be 'explicitly permitted', and who grants that permission?",
+      "why_it_matters": "The business rule has an undefined exception that affects validation.",
+      "citations": [
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "question": "Is a High/Critical priority count a required dashboard item? BR-010 lists four counts, but section 7.3 adds High/Critical priority TODOs.",
+      "why_it_matters": "The dashboard scope differs between BR-010 and section 7.3.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-011"
+      ]
+    },
+    {
+      "question": "Should deletion be hard or soft, and should it be recoverable? Is a TODO's history retained for audit?",
+      "why_it_matters": "BR-013 and BR-012 do not specify delete behaviour or audit retention.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "question": "What are the supported browsers and the agreed NFRs (performance, security, availability)? How do users authenticate (for example SSO)?",
+      "why_it_matters": "BR-015 and the acceptance criterion 'meets agreed NFRs' cannot be verified without them. The BRD also does not give a login method.",
+      "citations": [
+        "XATA_TODO_BRD-008-B",
+        "XATA_TODO_BRD-014",
+        "XATA_TODO_BRD-013"
+      ]
+    },
+    {
+      "question": "How is team membership defined and maintained, for example whether a user can belong to several teams, and what scope a TODO's 'team' has?",
+      "why_it_matters": "BR-011 depends on the team structure, which XATA is to supply but which is not specified.",
+      "citations": [
+        "XATA_TODO_BRD-013",
+        "XATA_TODO_BRD-008-B"
+      ]
+    },
+    {
+      "question": "Should Completed status be reversible, and how are status changes handled (for example reopening a completed TODO)? Is a TODO without an assignee allowed, and to whom does it belong?",
+      "why_it_matters": "The status workflow and the unassigned case are not specified.",
+      "citations": [
+        "XATA_TODO_BRD-008-A",
+        "XATA_TODO_BRD-009",
+        "XATA_TODO_BRD-012"
+      ]
+    },
+    {
+      "question": "What are the Administrator's 'basic platform configuration' and user-management functions? There is no matching business requirement.",
+      "why_it_matters": "The role is described, but no BR covers user management or configuration. The scope also lists a 'basic user profile' without detail.",
+      "citations": [
+        "XATA_TODO_BRD-007",
+        "XATA_TODO_BRD-005"
+      ]
+    },
+    {
+      "question": "The final acceptance criterion says the core lifecycle must be completed without administrator assistance. Which actions count as the core lifecycle?",
+      "why_it_matters": "The testable scope of this criterion is ambiguous.",
+      "citations": [
+        "XATA_TODO_BRD-014"
+      ]
+    }
+  ],
+  "assumptions": [
+    {
+      "text": "XATA will provide the user list and team structure.",
+      "citations": [
+        "XATA_TODO_BRD-013"
+      ]
+    },
+    {
+      "text": "XATA will provide branding requirements.",
+      "citations": [
+        "XATA_TODO_BRD-013"
+      ]
+    },
+    {
+      "text": "The initial release is web-based.",
+      "citations": [
+        "XATA_TODO_BRD-013"
+      ]
+    },
+    {
+      "text": "XBS will propose the technical architecture based on the BRD and NFR.",
+      "citations": [
+        "XATA_TODO_BRD-013",
+        "XATA_TODO_BRD-016"
+      ]
+    },
+    {
+      "text": "The first release will use a single enterprise environment.",
+      "citations": [
+        "XATA_TODO_BRD-013"
+      ]
+    }
+  ]
+}

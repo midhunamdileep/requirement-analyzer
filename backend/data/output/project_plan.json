@@ -1,0 +1,867 @@
+{
+  "review": {
+    "objectives": [
+      {
+        "text": "Replace email, spreadsheets, chat and personal notes with a single centralized web application for managing TODO items, keeping the first release intentionally small and easy to use.",
+        "citations": [
+          "XATA_TODO_BRD-002",
+          "XATA_TODO_BRD-003"
+        ]
+      },
+      {
+        "text": "Let users quickly create and update TODOs, assign them to one another, and manage basic priority and due dates.",
+        "citations": [
+          "XATA_TODO_BRD-004"
+        ]
+      },
+      {
+        "text": "Give visibility of open, completed and overdue work through a simple dashboard, and reduce reliance on spreadsheets, email and chat for TODO tracking.",
+        "citations": [
+          "XATA_TODO_BRD-004",
+          "XATA_TODO_BRD-011"
+        ]
+      },
+      {
+        "text": "Meet the agreed non-functional targets (performance, availability, security, data integrity, backup and recovery, usability, maintainability) before production acceptance.",
+        "citations": [
+          "XATA_TODO_NFR-002",
+          "XATA_TODO_NFR-016",
+          "XATA_TODO_NFR-017"
+        ]
+      }
+    ],
+    "scope_in": [
+      {
+        "text": "User login and basic user profile; role-based access for Employee, Team Lead and Administrator.",
+        "citations": [
+          "XATA_TODO_BRD-005",
+          "XATA_TODO_BRD-007"
+        ]
+      },
+      {
+        "text": "Create, view, edit, delete and complete TODOs, with title, description, optional notes, status, priority and due date.",
+        "citations": [
+          "XATA_TODO_BRD-005",
+          "XATA_TODO_BRD-008-A",
+          "XATA_TODO_BRD-009",
+          "XATA_TODO_BRD-010"
+        ]
+      },
+      {
+        "text": "Assign TODOs to users, with a basic team view of assigned TODOs for Team Leads.",
+        "citations": [
+          "XATA_TODO_BRD-005",
+          "XATA_TODO_BRD-008-B"
+        ]
+      },
+      {
+        "text": "Filter and search TODOs; dashboard showing TODO status counts, including High/Critical items listed in section 7.3.",
+        "citations": [
+          "XATA_TODO_BRD-005",
+          "XATA_TODO_BRD-008-B",
+          "XATA_TODO_BRD-011"
+        ]
+      },
+      {
+        "text": "Audit information (created-by, created-date, updated-by, updated-date).",
+        "citations": [
+          "XATA_TODO_BRD-005",
+          "XATA_TODO_BRD-008-B"
+        ]
+      },
+      {
+        "text": "Web interface for supported browsers (for example Chrome and Edge), responsive for desktop and tablet.",
+        "citations": [
+          "XATA_TODO_BRD-008-B",
+          "XATA_TODO_NFR-008",
+          "XATA_TODO_NFR-013"
+        ]
+      },
+      {
+        "text": "Non-functional delivery: performance, availability, security, backup/DR, observability, accessibility and maintainability, with documented APIs and tests.",
+        "citations": [
+          "XATA_TODO_NFR-003",
+          "XATA_TODO_NFR-004",
+          "XATA_TODO_NFR-006",
+          "XATA_TODO_NFR-010",
+          "XATA_TODO_NFR-011",
+          "XATA_TODO_NFR-012",
+          "XATA_TODO_NFR-015"
+        ]
+      }
+    ],
+    "scope_out": [
+      {
+        "text": "Advanced project management, Gantt charts, time tracking and resource capacity planning.",
+        "citations": [
+          "XATA_TODO_BRD-006"
+        ]
+      },
+      {
+        "text": "Chat or collaboration features, and file/document management.",
+        "citations": [
+          "XATA_TODO_BRD-006"
+        ]
+      },
+      {
+        "text": "AI-generated TODOs, native mobile applications, complex workflow approvals and external customer access.",
+        "citations": [
+          "XATA_TODO_BRD-006"
+        ]
+      }
+    ],
+    "assumptions": [
+      {
+        "text": "XATA will provide the user list and team structure, and the branding requirements.",
+        "citations": [
+          "XATA_TODO_BRD-013"
+        ]
+      },
+      {
+        "text": "The initial release is web-based and runs in a single enterprise environment.",
+        "citations": [
+          "XATA_TODO_BRD-013"
+        ]
+      },
+      {
+        "text": "XBS proposes the technical architecture from the BRD and NFR, and agrees it with XATA.",
+        "citations": [
+          "XATA_TODO_BRD-013",
+          "XATA_TODO_BRD-016"
+        ]
+      },
+      {
+        "text": "Accessibility target is WCAG 2.1 AA 'where practical' (Should priority).",
+        "citations": [
+          "XATA_TODO_NFR-009",
+          "XATA_TODO_NFR-017"
+        ]
+      }
+    ],
+    "constraints": [
+      {
+        "text": "Performance: 95% of normal page/API requests, create/update and search/filter must take 2 seconds or less. Dashboard must load within 3 seconds. At least 500 concurrent users.",
+        "citations": [
+          "XATA_TODO_NFR-003"
+        ]
+      },
+      {
+        "text": "Availability of at least 99.5% a month, excluding agreed maintenance. Maintenance must be communicated at least 24 hours ahead. Service must be restored within 30 minutes after an application failure.",
+        "citations": [
+          "XATA_TODO_NFR-004"
+        ]
+      },
+      {
+        "text": "Backup and recovery: RPO 15 minutes (unless XATA agrees otherwise) and RTO 30 minutes. Recovery procedures must be documented and tested periodically.",
+        "citations": [
+          "XATA_TODO_NFR-012",
+          "XATA_TODO_NFR-015"
+        ]
+      },
+      {
+        "text": "Security: authentication before protected functions, role-based authorization, TLS in transit, no hard-coded credentials, and protection against injection, broken access control and XSS.",
+        "citations": [
+          "XATA_TODO_NFR-006"
+        ]
+      },
+      {
+        "text": "Support at least 100,000 TODO records initially without major redesign.",
+        "citations": [
+          "XATA_TODO_NFR-005"
+        ]
+      },
+      {
+        "text": "Data retention and deletion must follow XATA policy, and logs must not contain sensitive information.",
+        "citations": [
+          "XATA_TODO_NFR-007",
+          "XATA_TODO_NFR-014"
+        ]
+      },
+      {
+        "text": "XBS must demonstrate NFR compliance through testing, evidence, configuration review and operational validation before production acceptance.",
+        "citations": [
+          "XATA_TODO_NFR-016"
+        ]
+      },
+      {
+        "text": "Must priorities: Security, Performance, Availability, Data Integrity, Backup & Recovery, Usability, Maintainability. Should priorities: Accessibility, Advanced observability.",
+        "citations": [
+          "XATA_TODO_NFR-017"
+        ]
+      }
+    ],
+    "stakeholders": [
+      {
+        "text": "XATA: Business Owner / Client.",
+        "citations": [
+          "XATA_TODO_BRD-015"
+        ]
+      },
+      {
+        "text": "XBS: Implementation Partner.",
+        "citations": [
+          "XATA_TODO_BRD-015"
+        ]
+      },
+      {
+        "text": "XATA Business Users (Employees and Team Leads): end users.",
+        "citations": [
+          "XATA_TODO_BRD-015",
+          "XATA_TODO_BRD-007"
+        ]
+      },
+      {
+        "text": "XATA IT: technical and operational stakeholders. Also the likely source of the Administrator role and of infrastructure, IdP and monitoring decisions.",
+        "citations": [
+          "XATA_TODO_BRD-015",
+          "XATA_TODO_BRD-007"
+        ]
+      }
+    ],
+    "dependencies": [
+      {
+        "id": "DEP-1",
+        "description": "XATA decision on the authorization matrix: what 'authorized to manage' means per role, who may assign, reassign and delete, who is an 'authorized user', whether Completed can be reopened, and when an earlier due date is permitted.",
+        "owner": "XATA Business Owner",
+        "citations": [
+          "XATA_TODO_BRD-008-A",
+          "XATA_TODO_BRD-008-B",
+          "XATA_TODO_BRD-012"
+        ]
+      },
+      {
+        "id": "DEP-2",
+        "description": "Confirmation of the identity mechanism (OIDC-capable enterprise IdP), with a non-production tenant/app registration and test accounts for Employee, Team Lead and Administrator.",
+        "owner": "XATA IT",
+        "citations": [
+          "XATA_TODO_NFR-006",
+          "XATA_TODO_BRD-007"
+        ]
+      },
+      {
+        "id": "DEP-3",
+        "description": "XATA supplies the user list and team structure, and keeps team membership current.",
+        "owner": "XATA Business Owner",
+        "citations": [
+          "XATA_TODO_BRD-013",
+          "XATA_TODO_BRD-008-B"
+        ]
+      },
+      {
+        "id": "DEP-4",
+        "description": "XATA supplies branding requirements.",
+        "owner": "XATA Business Owner",
+        "citations": [
+          "XATA_TODO_BRD-013"
+        ]
+      },
+      {
+        "id": "DEP-5",
+        "description": "XATA provides and provisions the single enterprise hosting environment (compute, database, backup storage, network, DNS/TLS certificates), with redundancy that supports 99.5% availability, RPO and RTO.",
+        "owner": "XATA IT",
+        "citations": [
+          "XATA_TODO_BRD-013",
+          "XATA_TODO_NFR-004",
+          "XATA_TODO_NFR-012"
+        ]
+      },
+      {
+        "id": "DEP-6",
+        "description": "XATA data retention and deletion policy, including soft versus hard delete and audit-history retention.",
+        "owner": "XATA IT",
+        "citations": [
+          "XATA_TODO_NFR-007",
+          "XATA_TODO_NFR-014"
+        ]
+      },
+      {
+        "id": "DEP-7",
+        "description": "XATA confirms the agreed NFR set: supported browsers, backup schedule, maintenance windows and any change to the RPO.",
+        "owner": "XATA Business Owner",
+        "citations": [
+          "XATA_TODO_NFR-012",
+          "XATA_TODO_NFR-013",
+          "XATA_TODO_NFR-004",
+          "XATA_TODO_NFR-016"
+        ]
+      },
+      {
+        "id": "DEP-8",
+        "description": "Agreement with XATA IT on monitoring, logging and alerting tooling and the alert recipients.",
+        "owner": "XATA IT",
+        "citations": [
+          "XATA_TODO_NFR-011"
+        ]
+      },
+      {
+        "id": "DEP-9",
+        "description": "XATA business users and testers are available for UAT, and XATA gives formal acceptance and production sign-off.",
+        "owner": "XATA Business Owner",
+        "citations": [
+          "XATA_TODO_BRD-014",
+          "XATA_TODO_NFR-016",
+          "XATA_TODO_BRD-016"
+        ]
+      }
+    ],
+    "timeline_statements": [],
+    "information_gaps": [
+      "No target go-live date or deadline is given (target_go_live is null). Only the start date (2027-01-04) is supplied in the planning inputs.",
+      "No budget is stated.",
+      "The only constraint in the planning inputs is a placeholder ('Replace this example with real values...'). It has been treated as no real constraint. Real constraints need confirming.",
+      "The planning inputs list only three people. They do not say whether XBS can add DevOps, QA, UX or project management capacity, and the availability of those roles is unknown.",
+      "The Frontend Developer's skills are Angular and TypeScript, but the architecture specifies React. The SPA framework needs deciding, or XATA's agreement to Angular.",
+      "The Frontend Developer is only 50% available. It is unknown whether the frontend scope fits within that capacity.",
+      "The Technical Architect has AWS skills (S3, SQS, CloudWatch, Lambda, SNS). The hosting platform (AWS, on-premises or other) is not confirmed.",
+      "The authorization matrix and the definition of 'authorized user' are unresolved.",
+      "The identity mechanism (SSO/OIDC IdP versus local accounts) is unconfirmed.",
+      "Team membership model is undefined: can a user be in several teams, and what is a TODO's team scope?",
+      "Retention policy and soft versus hard delete are unknown.",
+      "Rules for due dates earlier than creation, reopening a Completed TODO, and TODOs without an assignee are undefined.",
+      "It is unclear whether the High/Critical count is a required dashboard item, since BR-010 lists four counts and section 7.3 adds a fifth.",
+      "Administrator functions (user management, basic platform configuration) are undefined and have no matching business requirement.",
+      "Supported browser versions, the backup schedule, maintenance windows and the hosting redundancy (zones, database failover) are not specified.",
+      "Monitoring and alerting tooling is not specified.",
+      "XATA availability for decisions, reviews and UAT is unknown, as are branding assets and a timeline for the user and team data.",
+      "Which actions count as the 'core TODO lifecycle' that must work without administrator assistance is not defined."
+    ]
+  },
+  "resourcing": {
+    "roles": [
+      {
+        "role": "Technical Architect",
+        "skills": [
+          "Java",
+          "Spring Boot",
+          "PostgreSQL",
+          "AWS S3, SQS, CloudWatch, Lambda, SNS",
+          "Solution and security architecture"
+        ],
+        "fte": 1.0,
+        "phase_ids": [
+          "p1_mobilize",
+          "p2_foundation",
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [
+          "Identity",
+          "Data",
+          "Backup & DR",
+          "Application"
+        ],
+        "rationale": "Owns the architecture, the authorization design, the OIDC integration design, the database design (replica, WAL archiving, indexes) and the backup/DR design. Also reviews code and leads the NFR evidence. Named in the planning inputs at 100%.",
+        "source": "inputs"
+      },
+      {
+        "role": "Backend Developer",
+        "skills": [
+          "Java",
+          "Spring Boot",
+          "PostgreSQL"
+        ],
+        "fte": 1.0,
+        "phase_ids": [
+          "p2_foundation",
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [
+          "Application",
+          "Data"
+        ],
+        "rationale": "Builds the REST API, authorization module, domain services (TODO, filter and search, dashboard, team and user, audit), the repository layer and the unit tests. Named in the planning inputs at 100%.",
+        "source": "inputs"
+      },
+      {
+        "role": "Frontend Developer",
+        "skills": [
+          "Angular",
+          "TypeScript",
+          "Accessible UI and responsive design"
+        ],
+        "fte": 0.5,
+        "phase_ids": [
+          "p2_foundation",
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [
+          "Presentation"
+        ],
+        "rationale": "Builds the responsive, accessible SPA. The named person has Angular, not the React in the architecture. The framework needs deciding or React ramp-up time is needed. At 50% availability the frontend is the likely bottleneck. Named in the planning inputs.",
+        "source": "inputs"
+      },
+      {
+        "role": "DevOps / Platform Engineer",
+        "skills": [
+          "Containers",
+          "CI/CD pipelines",
+          "NGINX or cloud load balancer, TLS, WAF",
+          "Secrets management",
+          "Prometheus, Grafana, log aggregation",
+          "PostgreSQL backup and WAL archiving",
+          "Load testing (k6 or JMeter)"
+        ],
+        "fte": 0.5,
+        "phase_ids": [
+          "p1_mobilize",
+          "p2_foundation",
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [
+          "Edge",
+          "Security & Configuration",
+          "Operations",
+          "Backup & DR",
+          "Quality",
+          "Identity"
+        ],
+        "rationale": "Nobody in the planning inputs covers infrastructure, the edge, secrets, observability, backup or the CI pipeline. This is an assumed addition; 0.5 FTE is an estimate, higher during foundation and hardening.",
+        "source": "assumed"
+      },
+      {
+        "role": "QA / Test Engineer",
+        "skills": [
+          "Test automation",
+          "API and UI testing",
+          "Security testing (access control, XSS, injection)",
+          "Performance testing",
+          "Accessibility testing"
+        ],
+        "fte": 0.5,
+        "phase_ids": [
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [
+          "Quality"
+        ],
+        "rationale": "Needed for integration and acceptance tests, NFR evidence, performance and security testing, and UAT support. This is an assumed addition.",
+        "source": "assumed"
+      },
+      {
+        "role": "Project Manager / Business Analyst",
+        "skills": [
+          "Delivery management",
+          "Requirements clarification",
+          "Stakeholder management",
+          "UAT coordination"
+        ],
+        "fte": 0.5,
+        "phase_ids": [
+          "p1_mobilize",
+          "p2_foundation",
+          "p3_core_todo",
+          "p4_team_dash",
+          "p5_harden",
+          "p6_uat_golive"
+        ],
+        "covers_tech_layers": [],
+        "rationale": "Needed to close the many open business questions (authorization matrix, retention, Administrator scope), manage the XATA dependencies and run UAT. This is an assumed addition.",
+        "source": "assumed"
+      }
+    ],
+    "onboarding": [
+      {
+        "item": "Workshop and written decision on the authorization matrix, assignment rules, reopen rule and due-date override rule",
+        "owner": "XATA Business Owner",
+        "needed_before_phase": "p3_core_todo",
+        "dependency_ids": [
+          "DEP-1"
+        ]
+      },
+      {
+        "item": "Confirmation of OIDC IdP, non-production app registration, redirect URIs and test accounts for each role",
+        "owner": "XATA IT",
+        "needed_before_phase": "p2_foundation",
+        "dependency_ids": [
+          "DEP-2"
+        ]
+      },
+      {
+        "item": "Provisioning of the hosting environment (non-production first, then production), network access, TLS certificates and database and backup storage",
+        "owner": "XATA IT",
+        "needed_before_phase": "p2_foundation",
+        "dependency_ids": [
+          "DEP-5"
+        ]
+      },
+      {
+        "item": "User list and team structure extract, with a named owner who keeps it current",
+        "owner": "XATA Business Owner",
+        "needed_before_phase": "p3_core_todo",
+        "dependency_ids": [
+          "DEP-3"
+        ]
+      },
+      {
+        "item": "Branding assets and guidelines",
+        "owner": "XATA Business Owner",
+        "needed_before_phase": "p3_core_todo",
+        "dependency_ids": [
+          "DEP-4"
+        ]
+      },
+      {
+        "item": "Data retention and deletion policy, including soft versus hard delete and audit retention",
+        "owner": "XATA IT",
+        "needed_before_phase": "p4_team_dash",
+        "dependency_ids": [
+          "DEP-6"
+        ]
+      },
+      {
+        "item": "Confirmed NFR set: supported browsers, backup schedule, maintenance windows and RPO",
+        "owner": "XATA Business Owner",
+        "needed_before_phase": "p2_foundation",
+        "dependency_ids": [
+          "DEP-7"
+        ]
+      },
+      {
+        "item": "Agreed monitoring, logging and alerting tooling and alert recipients",
+        "owner": "XATA IT",
+        "needed_before_phase": "p5_harden",
+        "dependency_ids": [
+          "DEP-8"
+        ]
+      },
+      {
+        "item": "Named UAT testers and a sign-off authority from XATA",
+        "owner": "XATA Business Owner",
+        "needed_before_phase": "p6_uat_golive",
+        "dependency_ids": [
+          "DEP-9"
+        ]
+      },
+      {
+        "item": "Decision on the SPA framework (React per the architecture versus Angular per the available skills), plus any ramp-up plan",
+        "owner": "Technical Architect",
+        "needed_before_phase": "p2_foundation",
+        "dependency_ids": []
+      },
+      {
+        "item": "Team onboarding: access to source control, CI, environments and project tooling; briefing on the BRD and NFR",
+        "owner": "Project Manager / Business Analyst",
+        "needed_before_phase": "p1_mobilize",
+        "dependency_ids": []
+      }
+    ],
+    "availability_assumptions": [
+      "Start date 2027-01-04 is from the planning inputs. No end date or target go-live is given.",
+      "Technical Architect and Backend Developer are available at 100% throughout, as stated in the planning inputs.",
+      "Frontend Developer is available at 50%, as stated in the planning inputs.",
+      "DevOps/Platform Engineer, QA/Test Engineer and Project Manager/BA are assumed. Their availability and the 0.5 FTE levels are estimates, to be confirmed with XBS.",
+      "No holidays, leave or other commitments are known and none are assumed.",
+      "XATA stakeholders are assumed to respond to decisions and reviews promptly. Their actual availability is not given."
+    ],
+    "resource_risks": [
+      "The Frontend Developer's skills (Angular) do not match the specified React stack. The options are ramp-up time, a framework change needing XATA's agreement, or an extra React resource.",
+      "The 50% frontend capacity may limit UI throughput, especially for accessibility, responsive design and dashboard work.",
+      "No person is named for infrastructure, edge, observability, backup/DR or QA. If these assumed roles cannot be provided, the Architect and Backend Developer would be stretched and NFR evidence is at risk.",
+      "The Technical Architect is a single point of failure: architecture, database, identity and DR all depend on one person.",
+      "The Architect's AWS skills (S3, SQS, Lambda, SNS) are not part of the architecture. Their fit with XATA's hosting platform is unknown.",
+      "Delays in XATA decisions (authorization matrix, IdP, environment) would leave the team idle or force rework."
+    ]
+  },
+  "roadmap": {
+    "phases": [
+      {
+        "id": "p1_mobilize",
+        "name": "Mobilize and design confirmation",
+        "duration_weeks": 2,
+        "depends_on": [],
+        "objectives": [
+          "Mobilize the team and confirm scope, NFRs and the architecture with XATA",
+          "Resolve the critical open questions: authorization matrix, identity mechanism, hosting environment",
+          "Agree the SPA framework given the available frontend skills",
+          "Agree the delivery approach, environments and acceptance process"
+        ],
+        "deliverables": [
+          "Confirmed architecture and design baseline",
+          "Decision log covering the authorization matrix, assignment rules, reopen and due-date rules",
+          "Confirmed NFR set and test approach",
+          "Delivery plan, risk register and onboarding checklist"
+        ],
+        "requirement_ids": [],
+        "dependency_ids": [
+          "DEP-1",
+          "DEP-2",
+          "DEP-5",
+          "DEP-7"
+        ],
+        "estimate_basis": "XBS estimate, not from the documents. Based on a small, well-defined scope but many open business questions needing XATA workshops. Duration depends on XATA response times.",
+        "confidence": "medium"
+      },
+      {
+        "id": "p2_foundation",
+        "name": "Platform foundation",
+        "duration_weeks": 3,
+        "depends_on": [
+          "p1_mobilize"
+        ],
+        "objectives": [
+          "Set up the CI pipeline with unit and integration tests and dependency scanning",
+          "Stand up the non-production environment: edge proxy with TLS, containers, PostgreSQL with replica and WAL archiving, secrets and configuration store",
+          "Integrate OIDC authentication and role mapping",
+          "Create the API skeleton (OpenAPI, versioned) and SPA skeleton",
+          "Set up baseline logging, health checks and metrics"
+        ],
+        "deliverables": [
+          "Working CI/CD pipeline",
+          "Non-production environment with edge, database and secrets",
+          "Login working end to end through the IdP",
+          "API and SPA skeletons deployed",
+          "Baseline logging and health checks"
+        ],
+        "requirement_ids": [],
+        "dependency_ids": [
+          "DEP-2",
+          "DEP-5",
+          "DEP-8"
+        ],
+        "estimate_basis": "XBS estimate. Assumes the IdP and the hosting environment are available when the phase starts and that the DevOps role is staffed. Infrastructure effort is highly uncertain until the hosting platform is known.",
+        "confidence": "low"
+      },
+      {
+        "id": "p3_core_todo",
+        "name": "Core TODO lifecycle",
+        "duration_weeks": 4,
+        "depends_on": [
+          "p2_foundation"
+        ],
+        "objectives": [
+          "Deliver create, edit, complete, assign and status/priority handling with server-side validation",
+          "Implement role-based authorization to prevent unauthorized modification",
+          "Implement audit fields and concurrent-update protection",
+          "Build the web UI for the core flows with XATA branding"
+        ],
+        "deliverables": [
+          "TODO Service, Authorization Module and Audit Service",
+          "Create, edit, complete and assign UI flows",
+          "Unit and integration tests for the business rules (due date, Completed status, overdue)",
+          "Core lifecycle ready for UAT preview"
+        ],
+        "requirement_ids": [
+          "BR-001",
+          "BR-002",
+          "BR-003",
+          "BR-004",
+          "BR-005",
+          "BR-006",
+          "BR-007",
+          "BR-012",
+          "BR-014",
+          "BR-015"
+        ],
+        "dependency_ids": [
+          "DEP-1",
+          "DEP-3",
+          "DEP-4"
+        ],
+        "estimate_basis": "XBS estimate from the requirement count and a team of 2.5 development FTE (100% backend, 50% frontend). Frontend capacity and the unresolved authorization matrix drive the uncertainty.",
+        "confidence": "medium"
+      },
+      {
+        "id": "p4_team_dash",
+        "name": "Filtering, search, dashboard and team view",
+        "duration_weeks": 3,
+        "depends_on": [
+          "p3_core_todo"
+        ],
+        "objectives": [
+          "Implement filtering by status, priority, assignee and due date, and search by title or description",
+          "Implement the dashboard counts, including High/Critical if XATA confirms",
+          "Implement the Team Lead team view",
+          "Implement deletion rules per the retention policy",
+          "Create full-text and trigram indexes"
+        ],
+        "deliverables": [
+          "Filter & Search Service and Dashboard Service",
+          "Team & User Service with the Team Lead view",
+          "Delete functionality aligned with the retention policy",
+          "Dashboard, filter, search and team UI"
+        ],
+        "requirement_ids": [
+          "BR-008",
+          "BR-009",
+          "BR-010",
+          "BR-011",
+          "BR-013"
+        ],
+        "dependency_ids": [
+          "DEP-3",
+          "DEP-6"
+        ],
+        "estimate_basis": "XBS estimate. Team membership rules and the delete and retention approach are undefined, and the Frontend Developer is part-time.",
+        "confidence": "medium"
+      },
+      {
+        "id": "p5_harden",
+        "name": "NFR hardening and operational readiness",
+        "duration_weeks": 3,
+        "depends_on": [
+          "p4_team_dash"
+        ],
+        "objectives": [
+          "Run load and performance tests against the targets, with 500 concurrent users and 100,000+ records",
+          "Run security testing (access control, injection, XSS) and fix defects",
+          "Configure alerting and dashboards, and complete the backup, WAL archive and restore rehearsal against RPO and RTO",
+          "Complete accessibility, browser compatibility and usability checks",
+          "Document APIs, recovery procedures and restore dependencies"
+        ],
+        "deliverables": [
+          "Performance and load test report",
+          "Security test report",
+          "Backup/restore and DR rehearsal evidence",
+          "Alerting configuration and runbooks",
+          "NFR compliance evidence pack"
+        ],
+        "requirement_ids": [],
+        "dependency_ids": [
+          "DEP-7",
+          "DEP-8",
+          "DEP-5"
+        ],
+        "estimate_basis": "XBS estimate. Includes time for tuning and rework. Load results, the production-like environment and the RPO/RTO rehearsal could extend this phase.",
+        "confidence": "low"
+      },
+      {
+        "id": "p6_uat_golive",
+        "name": "UAT, production readiness and go-live",
+        "duration_weeks": 2,
+        "depends_on": [
+          "p5_harden"
+        ],
+        "objectives": [
+          "Run UAT against the BRD acceptance criteria with XATA users",
+          "Fix defects and retest",
+          "Prepare the production environment and migrate the user and team data",
+          "Obtain XATA acceptance, go live and begin hypercare"
+        ],
+        "deliverables": [
+          "UAT results and sign-off",
+          "Production deployment",
+          "Cutover and rollback plan",
+          "Handover documentation and hypercare plan"
+        ],
+        "requirement_ids": [],
+        "dependency_ids": [
+          "DEP-9",
+          "DEP-5"
+        ],
+        "estimate_basis": "XBS estimate. Assumes UAT testers are available at once and defects found are minor. Hypercare length is not planned.",
+        "confidence": "medium"
+      }
+    ],
+    "milestones": [
+      {
+        "id": "m1_kickoff",
+        "name": "Project kickoff",
+        "phase_id": "p1_mobilize",
+        "at": "start",
+        "criteria": "Team onboarded, kickoff held with XATA, and decision owners named for open business and technical questions."
+      },
+      {
+        "id": "m2_design_signoff",
+        "name": "Design and decisions signed off",
+        "phase_id": "p1_mobilize",
+        "at": "end",
+        "criteria": "Architecture, authorization matrix, identity approach, NFR set and SPA framework agreed in writing with XATA."
+      },
+      {
+        "id": "m3_foundation_ready",
+        "name": "Platform foundation ready",
+        "phase_id": "p2_foundation",
+        "at": "end",
+        "criteria": "CI pipeline works and a non-production environment is deployed. Login works through the IdP and the skeleton API and SPA are deployed."
+      },
+      {
+        "id": "m4_core_lifecycle",
+        "name": "Core TODO lifecycle complete",
+        "phase_id": "p3_core_todo",
+        "at": "end",
+        "criteria": "Users can log in, create, assign, update and complete TODOs. Unauthorized modification is blocked and audit fields are maintained."
+      },
+      {
+        "id": "m5_feature_complete",
+        "name": "Feature complete",
+        "phase_id": "p4_team_dash",
+        "at": "end",
+        "criteria": "Filtering, search, dashboard, team view and delete work in the non-production environment and dashboard counts match TODO state."
+      },
+      {
+        "id": "m6_nfr_validated",
+        "name": "NFRs validated",
+        "phase_id": "p5_harden",
+        "at": "end",
+        "criteria": "Performance, security, availability, backup/restore (RPO 15 min, RTO 30 min) and accessibility evidence is reviewed by XATA."
+      },
+      {
+        "id": "m7_go_live",
+        "name": "Production go-live and acceptance",
+        "phase_id": "p6_uat_golive",
+        "at": "end",
+        "criteria": "UAT passed, XATA signed off, production deployed and XATA can complete the core TODO lifecycle without administrator assistance."
+      }
+    ],
+    "releases": [
+      {
+        "name": "Release 0.9 - Core lifecycle (non-production UAT preview)",
+        "milestone_id": "m4_core_lifecycle",
+        "requirement_ids": [
+          "BR-001",
+          "BR-002",
+          "BR-003",
+          "BR-004",
+          "BR-005",
+          "BR-006",
+          "BR-007",
+          "BR-012",
+          "BR-014",
+          "BR-015"
+        ],
+        "exit_criteria": "Core lifecycle accepted by XATA in a non-production preview: create, assign, update and complete work, unauthorized edits are blocked, and the web UI works in the agreed browsers."
+      },
+      {
+        "name": "Release 1.0 - Production",
+        "milestone_id": "m7_go_live",
+        "requirement_ids": [
+          "BR-008",
+          "BR-009",
+          "BR-010",
+          "BR-011",
+          "BR-013"
+        ],
+        "exit_criteria": "All BRD acceptance criteria met: correct filter, search and dashboard results, team view and permitted deletion. The agreed NFRs are demonstrated, UAT is signed off and the system is live in production."
+      }
+    ],
+    "deferred": [],
+    "risks": [
+      "Authorization matrix unresolved (BR-003, BR-005, BR-014): wrong assumptions cause rework in authorization and the UI. Mitigation: decide in p1 and design the module to be configurable.",
+      "Identity mechanism unconfirmed: if there is no OIDC IdP, local account management adds security and support scope and extends p2.",
+      "Frontend skills mismatch (Angular versus React) and 50% availability put the UI at risk. Decide the framework in p1 and plan ramp-up or extra capacity.",
+      "No named DevOps, QA or project management resource in the inputs. The plan assumes them and fails or slips if they are not provided.",
+      "Team and user data quality and ownership: stale membership gives wrong team views and permissions (BR-011, BR-014).",
+      "Retention policy and soft versus hard delete unknown: may change deletion, purge and audit-log design (BR-013, BR-012).",
+      "RPO 15 min, RTO 30 min and 99.5% availability in a single environment depend on XATA infrastructure redundancy and on rehearsed restores. Cost and readiness may be constraints.",
+      "Live dashboard aggregates and full-text search may miss targets as data grows beyond 100,000 records. Load test early (start in p4) and keep caching or a search engine as a fallback.",
+      "Undefined rules (due-date override, reopening Completed, High/Critical dashboard count) could affect dashboard counts and the Completed status invariant.",
+      "Administrator functions are undefined and have no business requirement, so scope creep is possible. Hold the baseline at 'manage users and basic configuration' and handle additions through change control.",
+      "Phase durations are XBS estimates with no stated deadline. They depend on timely XATA decisions and environment provisioning, and must be re-planned once the real constraints are confirmed.",
+      "Observability tooling not specified by XATA. Alerting and monitoring choices must be agreed with XATA IT, or p5 slips."
+    ]
+  }
+}

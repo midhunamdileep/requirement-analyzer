@@ -1,0 +1,277 @@
+# Solution Architecture: XATA TODO Management Platform
+
+## Design decisions
+
+### AD-01: Stateless modular monolith behind a load balancer, web-only first release [XATA_TODO_BRD-003] [XATA_TODO_BRD-006] [XATA_TODO_BRD-013] [XATA_TODO_NFR-005] [XATA_TODO_NFR-003] [XATA_TODO_NFR-004]
+
+Build the platform as a modular monolith: a layered, stateless backend API with separate presentation, business logic and persistence layers. Run at least two identical instances behind a load-balancing reverse proxy in a single enterprise environment. No native mobile apps.
+
+- **Rationale:** The first release is intentionally small, web-only and runs in one environment. A modular monolith avoids the operational cost of microservices. Stateless instances can be scaled horizontally and make rolling restarts and failover simple, which supports 500 concurrent users and the availability target. Module boundaries leave room for later extraction.
+- **Alternatives considered:** Microservices (too much operational overhead for a small first release); Single instance (single point of failure, cannot meet availability); Server-rendered monolith with session affinity (harder to scale horizontally)
+- **Satisfies:** BR-015, NFR-PERF-005, NFR-AVL-001
+
+### AD-02: Responsive single-page web UI for supported browsers with accessibility built in [XATA_TODO_BRD-008-B] [XATA_TODO_BRD-006] [XATA_TODO_NFR-008] [XATA_TODO_NFR-009] [XATA_TODO_NFR-013]
+
+Deliver a responsive SPA that uses only standard web features. Target current Chrome and Edge, and standard desktop and tablet screens. Provide a minimal-step create/edit/complete flow (quick-create form, inline status change). Use colour-plus-text/icon badges for status, priority and overdue. Show understandable validation messages. Meet WCAG 2.1 AA where practical (keyboard navigation, labelled controls, contrast).
+
+- **Rationale:** BR-015 requires a web interface in supported browsers. The usability NFRs ask for minimal steps, responsive layout, understandable errors and visually distinct status/priority/overdue. Accessibility is a Should. Avoiding browser-specific features follows the compatibility NFR.
+- **Alternatives considered:** Server-rendered pages only (less interactive quick-edit); Native mobile apps (out of scope); Browser-specific features (not approved by NFR)
+- **Satisfies:** BR-015, BR-001, BR-004
+
+### AD-03: Authentication through enterprise OIDC single sign-on [XATA_TODO_BRD-005] [XATA_TODO_BRD-014] [XATA_TODO_NFR-006]
+
+Authenticate all users via an external enterprise identity provider using OpenID Connect (Authorization Code with PKCE). The API validates tokens on every request and rejects unauthenticated access to protected functions. The IdP supplies identity and basic profile, and the platform stores a local user profile and role keyed by IdP subject. If XATA has no IdP, fall back to local accounts with a modern adaptive hash (Argon2id or bcrypt).
+
+- **Rationale:** The NFRs require authentication before any protected function and secure hashing if passwords are locally managed. The authentication mechanism is an open question, so SSO is stated as an assumption. SSO avoids storing passwords and reduces login friction. The BRD includes login and a basic user profile.
+- **Alternatives considered:** Local username/password only (credential storage burden); SAML (possible if IdP requires it); Anonymous read access (violates NFR)
+- **Satisfies:** BR-001, BR-014
+
+### AD-04: Role-based access control with object-level authorization policy [XATA_TODO_BRD-007] [XATA_TODO_BRD-008-A] [XATA_TODO_BRD-008-B] [XATA_TODO_BRD-012] [XATA_TODO_NFR-006] [XATA_TODO_NFR-014]
+
+Implement RBAC for the roles Employee, Team Lead and Administrator. Add object-level checks in a central authorization module that runs server-side before every read, edit, assign, reassign, status change or delete. Assumed default policy, to be confirmed by XATA: Employees manage TODOs they created or are assigned. Team Leads also manage TODOs created by or assigned to members of their team and can assign to team members. Administrators manage users and configuration, and do not by default edit others' TODOs. Unauthorized attempts return 403 and are logged. The UI hides actions that are not permitted, but enforcement is only in the backend.
+
+- **Rationale:** BR-003, BR-005 and BR-014 depend on a clear 'authorized to manage' rule, which is an open question. A single centralized policy makes the rule easy to change and test. It also protects against broken access control, and limits data access to what each role is permitted to see.
+- **Alternatives considered:** Role checks only, no object-level checks (cannot stop modification of another user's TODO); Authorization scattered in controllers (inconsistent, hard to test); Full ABAC/policy engine (over-engineered for release 1)
+- **Satisfies:** BR-003, BR-005, BR-013, BR-014, BR-011
+
+### AD-05: TODO domain model with server-side enforced business rules [XATA_TODO_BRD-008-A] [XATA_TODO_BRD-008-B] [XATA_TODO_BRD-009] [XATA_TODO_BRD-012] [XATA_TODO_NFR-007]
+
+Model a TODO with a UUID, title (mandatory), description, optional notes, status (enum Open, In Progress, Completed only), priority (enum Low, Medium, High, Critical), due date, optional assignee, and created-by/created-date/updated-by/updated-date. Enforce the rules in a domain service on the server: title required; due date not earlier than creation date unless an explicit override is supplied (assumed to be allowed only for Team Leads and Administrators, pending confirmation); marking complete sets status Completed and a status of Completed is the only way a TODO counts as completed; assignee must be an active, authorized user. Reopening a Completed TODO is assumed to be allowed to authorized users. A TODO with no assignee belongs to its creator. Validation is repeated in the UI only for usability.
+
+- **Rationale:** These rules come directly from the BRD business rules and requirements. Server-side validation is an explicit NFR. Open questions on override, reopening and unassigned ownership are resolved as stated assumptions.
+- **Alternatives considered:** Client-side-only validation (insecure); Free-text status/priority (breaks reporting and dashboard counts); Configurable status workflow (out of scope: complex workflow approvals)
+- **Satisfies:** BR-001, BR-002, BR-004, BR-005, BR-006, BR-007, BR-012
+
+### AD-06: PostgreSQL relational store with indexed filter and search [XATA_TODO_BRD-008-B] [XATA_TODO_NFR-003] [XATA_TODO_NFR-005] [XATA_TODO_NFR-007]
+
+Use a managed or clustered relational database (PostgreSQL) with foreign keys between TODOs and users. Add indexes on status, priority, assignee, due date and created-by (including composite indexes for common filter combinations). Provide title/description search using the database's built-in full-text or trigram index. Use server-side pagination and sorting on all list endpoints. Filters combine with AND, and search combines with filters.
+
+- **Rationale:** Relational storage gives referential integrity, transactions and straightforward aggregation. Database-native indexing meets the filter and search response targets for 100,000+ records without adding a separate search cluster. Pagination bounds response size and time.
+- **Alternatives considered:** Dedicated search engine such as Elasticsearch (extra component, unnecessary at 100k records); NoSQL document store (weaker referential integrity); Unindexed LIKE queries (will not meet latency at volume)
+- **Satisfies:** BR-008, BR-009, NFR-PERF-004, NFR-PERF-001
+
+### AD-07: Dashboard counts computed from live aggregate queries [XATA_TODO_BRD-008-B] [XATA_TODO_BRD-011] [XATA_TODO_BRD-012] [XATA_TODO_BRD-014] [XATA_TODO_NFR-003]
+
+Serve dashboard data through a dedicated endpoint that returns Open, In Progress, Completed and Overdue counts plus the list of High/Critical priority TODOs. Overdue is computed at query time as due date < today AND status <> Completed, so it is never stored. Counts are scoped to what the user is authorized to see (own TODOs, or team for Team Leads). Use indexed aggregate SQL. If load tests show a need, add a short-TTL (for example 30-60 s) cache per user. High/Critical is treated as a required dashboard section (assumption on the open question).
+
+- **Rationale:** Computing from the source data keeps counts correct as required by acceptance criteria, and computing Overdue on query avoids stale data. Indexed aggregates fit within the 3 s dashboard target at the expected scale. Caching is kept as an option rather than a first step.
+- **Alternatives considered:** Stored/denormalized counters (risk of drift); Nightly batch (counts not current); Always-on cache (stale data risk without need)
+- **Satisfies:** BR-010, NFR-PERF-003, BR-006
+
+### AD-08: Team view driven by team membership imported from XATA [XATA_TODO_BRD-005] [XATA_TODO_BRD-007] [XATA_TODO_BRD-013] [XATA_TODO_BRD-008-B]
+
+Keep a team and team-membership data model (a user may belong to one or more teams, assumed) that is loaded from the user list and team structure XATA provides, via an Administrator import/maintenance function or IdP group sync. The Team Lead team view lists TODOs assigned to members of the teams the lead manages, with the same filters and an overdue highlight.
+
+- **Rationale:** BR-011 needs a team definition, which XATA is to provide. Keeping membership as data makes the authorization policy and the team view use one source. Handling multiple teams is a conservative assumption.
+- **Alternatives considered:** Hard-coded teams (inflexible); Team derived only from reporting lines in the IdP (not confirmed as available)
+- **Satisfies:** BR-011, BR-005, BR-014
+
+### AD-09: Optimistic concurrency and transactional integrity for updates [XATA_TODO_NFR-007] [XATA_TODO_BRD-008-A] [XATA_TODO_BRD-008-B]
+
+Give each TODO a version number (or ETag). Updates must send the version they read, and the server rejects stale updates with a 409 conflict and a clear message so users can refresh and retry. Updates and their audit entry are written in one database transaction. UUID primary keys, NOT NULL/CHECK constraints for status and priority, and foreign keys to users are enforced in the database. All timestamps are stored in UTC and set by the server.
+
+- **Rationale:** The NFR forbids silently overwriting conflicting data, and requires unique IDs, consistent timestamps and referential integrity. Optimistic locking suits low-contention TODO edits.
+- **Alternatives considered:** Last-write-wins (silent overwrites); Pessimistic locks (poor usability, stuck locks)
+- **Satisfies:** BR-003, BR-012, BR-002
+
+### AD-10: Soft delete and audit trail with retention per XATA policy [XATA_TODO_BRD-008-B] [XATA_TODO_BRD-012] [XATA_TODO_NFR-006] [XATA_TODO_NFR-007] [XATA_TODO_NFR-014]
+
+Delete TODOs by soft delete (deleted flag, deleted-by, deleted-date), restricted to authorized users per AD-04. Deleting never cascades to user accounts or other TODOs. Deleted TODOs are excluded from lists and counts. A purge job removes them once XATA's retention policy period has passed (period to be provided). Keep the created/updated-by/date fields on every TODO, plus an append-only audit log of changes to TODOs (field changes, status, assignment, deletion) and administrative actions.
+
+- **Rationale:** Soft delete protects from accidental loss and supports audit, while the retention policy is unresolved. The NFRs require auditable administrative actions and deleted-data handling according to XATA policy. Foreign-key behaviour is set so no cascade reaches users.
+- **Alternatives considered:** Hard delete (no recovery or audit); Permanent retention of deleted data (conflicts with retention and privacy policy)
+- **Satisfies:** BR-013, BR-012, BR-014
+
+### AD-11: Performance design for 2s/3s response targets and 500 concurrent users [XATA_TODO_NFR-003] [XATA_TODO_NFR-005] [XATA_TODO_NFR-016]
+
+Set performance budgets of ≤2 s p95 for normal page/API calls, create/update and search/filter, and ≤3 s p95 for the dashboard. Use database connection pooling, paginated queries, selective columns, gzip/HTTP caching of static assets via CDN or proxy, and a SPA that loads data asynchronously. Verify with load tests simulating at least 500 concurrent active users on at least 100,000 TODO records, and run them again before production acceptance.
+
+- **Rationale:** The numbered performance targets need a measurable design approach and verification. Indexing (AD-06), aggregates (AD-07), and stateless scale-out (AD-01) are the main levers. The load test provides acceptance evidence.
+- **Alternatives considered:** Premature caching layer for every endpoint; No explicit load testing (cannot demonstrate compliance)
+- **Satisfies:** NFR-PERF-001, NFR-PERF-002, NFR-PERF-003, NFR-PERF-004, NFR-PERF-005
+
+### AD-12: High availability, health-checked self-healing and maintenance communication [XATA_TODO_NFR-004] [XATA_TODO_NFR-011] [XATA_TODO_BRD-013]
+
+Run at least two application instances across separate hosts or zones with load-balancer health checks, automatic restart and rolling (zero-downtime) deployments. Use a database with a standby replica and automated failover. Define automated recovery so an application failure is restored within 30 minutes (target is faster through automatic restart). Monitor monthly availability against ≥99.5% excluding agreed maintenance windows. Announce planned maintenance at least 24 hours in advance by email and an in-app banner.
+
+- **Rationale:** Redundancy removes single points of failure and meets the 99.5% availability target. Health checks and automatic restarts give recovery inside 30 minutes. A defined communication procedure covers the 24-hour notice.
+- **Alternatives considered:** Single instance with manual restart (cannot reliably meet 30 min and 99.5%); Active-active multi-region (cost not justified, single environment assumed)
+- **Satisfies:** NFR-AVL-001, NFR-AVL-002, NFR-AVL-003
+
+### AD-13: Backup, point-in-time recovery and tested disaster recovery [XATA_TODO_NFR-012] [XATA_TODO_NFR-015] [XATA_TODO_NFR-004]
+
+Back up the production database with continuous WAL archiving (point-in-time recovery) plus scheduled full backups on an agreed schedule, to encrypted storage with restricted access, giving RPO ≤15 minutes. Document restoration procedures and the dependencies needed to restore the service (database, IdP, secrets, configuration, container images), and target RTO ≤30 minutes. Test restoration periodically and record the results.
+
+- **Rationale:** The NFR sets RPO 15 minutes and RTO 30 minutes, requires protected backups, documented and periodically tested recovery, and documented dependencies. WAL archiving is the standard way to achieve RPO below one backup interval.
+- **Alternatives considered:** Nightly dump only (RPO up to 24 h); Untested backups (no assurance of restoration)
+- **Satisfies:** NFR-AVL-003, BR-012
+
+### AD-14: Security hardening: TLS, secret management, web-vulnerability protection [XATA_TODO_NFR-006] [XATA_TODO_NFR-014] [XATA_TODO_NFR-012]
+
+Enforce HTTPS/TLS (1.2+) for all traffic with HSTS. Keep credentials and keys in a secrets manager or environment-injected secrets, never in source code. Use parameterized queries via an ORM (injection), framework output encoding and Content-Security-Policy (XSS), centralized authorization (broken access control), CSRF protection and secure headers. Add dependency vulnerability scanning in CI. Encrypt the database and backups at rest. Collect only data required for TODO management. Sensitive data is not written to logs.
+
+- **Rationale:** These measures meet the security and privacy NFRs for transport encryption, secrets handling, protection against common web vulnerabilities and data minimization.
+- **Alternatives considered:** TLS only at the perimeter with plaintext internally (weaker); Secrets in config files (violates NFR)
+- **Satisfies:** BR-014, BR-015
+
+### AD-15: Observability: structured logs, correlation IDs, health checks, metrics and alerts [XATA_TODO_NFR-011] [XATA_TODO_NFR-010] [XATA_TODO_NFR-014] [XATA_TODO_NFR-017]
+
+Emit structured JSON logs with a correlation/request ID, with sensitive fields redacted. Expose liveness and readiness health endpoints. Collect metrics on request failures and response latency (p95 per endpoint) and configure alerts on service failures and availability or latency breaches. Ship logs and metrics to a central platform (stack to be chosen with XATA IT, for example Prometheus/Grafana and a log aggregator). Advanced observability such as distributed tracing is a Should and can follow.
+
+- **Rationale:** The operations NFRs require error logging with context, health checks, key metrics, correlation IDs and configurable alerts. Metrics also provide evidence for the latency and availability targets and drive the 30-minute recovery.
+- **Alternatives considered:** Plain-text logs only (hard to troubleshoot); Full distributed tracing in release 1 (Should, deferred)
+- **Satisfies:** NFR-AVL-003, NFR-AVL-001, NFR-PERF-001
+
+### AD-16: Maintainable layering, documented versioned API, externalized config and automated tests [XATA_TODO_NFR-010] [XATA_TODO_NFR-013] [XATA_TODO_NFR-016]
+
+Separate presentation (SPA), API/controllers, domain/business logic and persistence (repositories). Expose a documented REST API versioned under /api/v1 with an OpenAPI specification. Keep configuration (database URLs, IdP settings, limits) externalized via environment/config store. Cover critical business logic (title rule, due date rule, status rules, overdue calculation, authorization policy, dashboard counts) with automated unit tests, and add API integration tests in CI. Document major components and run NFR validation (load, security, recovery tests and configuration review) before production acceptance.
+
+- **Rationale:** The maintainability NFR requires this separation, documentation, unit tests and externalized configuration. Versionable APIs satisfy the compatibility NFR. NFR acceptance requires test evidence.
+- **Alternatives considered:** Business logic in controllers or stored procedures (tightly coupled); Unversioned, undocumented APIs
+- **Satisfies:** BR-015, BR-014, BR-010
+
+## Technology stack
+
+| Layer | Technology | Rationale | Assumptions | Decisions |
+|---|---|---|---|---|
+| Presentation | Responsive SPA (TypeScript, React) with an accessible component library | Delivers an interactive, responsive web UI for Chrome and Edge on desktop and tablet with minimal-step workflows, accessible components and no browser-specific features. | XATA branding requirements will be supplied; The team has TypeScript/React skills; another mainstream framework would also work | AD-02, AD-16 |
+| Edge | Reverse proxy / load balancer with TLS termination (for example NGINX or a cloud load balancer) and optional WAF | Terminates HTTPS, spreads load across stateless instances, health-checks them and serves static assets. | Enterprise TLS certificates are available; Single enterprise environment, on-premises or cloud | AD-01, AD-12, AD-14 |
+| Identity | Enterprise IdP via OpenID Connect (for example Microsoft Entra ID) | Delegates authentication and avoids storing passwords. Provides identity and optional group claims for roles and teams. | XATA has an OIDC-capable IdP (not confirmed). If not, local accounts with Argon2id/bcrypt are used. | AD-03, AD-14 |
+| Application | Stateless REST API backend (for example Java/Spring Boot or .NET, OpenAPI documented) in containers | Supports modular layering, mature security and validation features, ORM with parameterized queries, and horizontal scaling. | Container runtime or equivalent platform is available at XATA or XBS; Final language choice agreed with XATA IT | AD-01, AD-04, AD-05, AD-11, AD-16 |
+| Data | PostgreSQL with streaming replica, WAL archiving and full-text/trigram indexes | Relational integrity, transactions and native indexing for filter, search and aggregation. Supports point-in-time recovery for the 15-minute RPO and growth past 100,000 records. | Initial volume is about 100,000 TODOs, with growth beyond that; Retention period for deleted data will be provided by XATA | AD-06, AD-07, AD-09, AD-10, AD-12, AD-13 |
+| Security & Configuration | Secrets manager / injected environment configuration | Keeps credentials out of source code and externalizes configuration. | A vault or platform secret store is available | AD-14, AD-16 |
+| Operations | Central logging and metrics with alerting (for example Prometheus, Grafana, log aggregator) | Provides health checks, latency and failure metrics, correlation-ID logs and configurable alerts. | XATA IT specifies or approves the monitoring tooling | AD-15, AD-12 |
+| Backup & DR | Encrypted object/backup storage with scheduled full backups and continuous WAL archive | Meets RPO 15 min and RTO 30 min with access-controlled, restorable backups. | Backup schedule will be agreed with XATA; Restoration drills are run periodically | AD-13 |
+| Quality | CI pipeline with unit/integration tests, dependency scanning and load testing (for example k6 or JMeter) | Provides evidence for critical business logic tests and for the performance and NFR acceptance. | A production-like test environment is available for load testing | AD-11, AD-16, AD-14 |
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph layer_1["Presentation"]
+        web_ui["Web UI (SPA)"]
+    end
+    subgraph layer_2["Edge"]
+        edge_proxy["Edge Proxy / Load Balancer"]
+    end
+    subgraph layer_3["Identity"]
+        idp["Enterprise Identity Provider (OIDC)"]
+    end
+    subgraph layer_4["Application"]
+        api_layer["REST API Layer (v1)"]
+        authz_module["Authorization Module"]
+    end
+    subgraph layer_5["Domain"]
+        todo_service["TODO Service"]
+        query_service["Filter & Search Service"]
+        dashboard_service["Dashboard Service"]
+        team_user_service["Team & User Service"]
+        audit_service["Audit Service"]
+    end
+    subgraph layer_6["Persistence"]
+        data_access["Persistence / Repository Layer"]
+    end
+    subgraph layer_7["Data"]
+        primary_db["PostgreSQL Primary and Replica"]
+    end
+    subgraph layer_8["Backup & DR"]
+        backup_store["Backup & WAL Archive Storage"]
+    end
+    subgraph layer_9["Security & Configuration"]
+        secrets_config["Secrets & Configuration Store"]
+    end
+    subgraph layer_10["Operations"]
+        observability["Logging, Metrics & Alerting"]
+    end
+    web_ui -->|"HTTPS requests from the browser (TLS)"| edge_proxy
+    web_ui -->|"OIDC login redirect (Authorization Code + PKCE)"| idp
+    idp -->|"Authorization code / ID and access tokens"| web_ui
+    edge_proxy -->|"Forward requests to a healthy instance"| api_layer
+    api_layer -->|"Validate token signature and claims (keys/metadata)"| idp
+    api_layer -->|"Check role and object-level permission"| authz_module
+    api_layer -->|"Create, update, complete, assign, delete commands"| todo_service
+    api_layer -->|"List, filter and search queries"| query_service
+    api_layer -->|"Dashboard counts and High/Critical list request"| dashboard_service
+    api_layer -->|"Team view, assignable users, user administration"| team_user_service
+    todo_service -->|"Authorize modify/assign/delete decisions"| authz_module
+    query_service -->|"Resolve visibility scope for the user"| authz_module
+    dashboard_service -->|"Resolve visibility scope for counts"| authz_module
+    authz_module -->|"Look up roles and team membership"| team_user_service
+    todo_service -->|"Record TODO change events"| audit_service
+    team_user_service -->|"Record administrative actions"| audit_service
+    api_layer -->|"Record authorization denials"| audit_service
+    todo_service -->|"Persist TODO with version check in a transaction"| data_access
+    query_service -->|"Indexed filter/search queries with pagination"| data_access
+    dashboard_service -->|"Aggregate count queries"| data_access
+    team_user_service -->|"Read and write users, teams, membership"| data_access
+    audit_service -->|"Append audit log entries"| data_access
+    data_access -->|"SQL over TLS"| primary_db
+    primary_db -->|"Scheduled full backups and continuous WAL archiving"| backup_store
+    secrets_config -->|"Provide credentials and configuration at startup"| api_layer
+    api_layer -->|"Structured logs, correlation IDs, latency and failure metrics"| observability
+    edge_proxy -->|"Health check results and access metrics"| observability
+    primary_db -->|"Database health and replication metrics"| observability
+    backup_store -->|"Backup job status for alerting"| observability
+```
+
+### Components
+
+| Component | Layer | Responsibility |
+|---|---|---|
+| Web UI (SPA) | Presentation | Responsive, accessible browser interface for login, create/edit/complete/delete TODO, filter and search, dashboard and team view. |
+| Edge Proxy / Load Balancer | Edge | Terminates TLS, applies secure headers, load-balances across stateless API instances, runs health checks and serves static assets. |
+| Enterprise Identity Provider (OIDC) | Identity | Authenticates users via SSO and issues tokens with identity and optional role/group claims. |
+| REST API Layer (v1) | Application | Validates tokens, input and versioned requests, assigns correlation IDs, routes to domain services and maps errors (400/403/409) to understandable messages. |
+| Authorization Module | Application | Central RBAC and object-level policy deciding who may view, edit, assign, reassign, complete or delete a TODO. |
+| TODO Service | Domain | Creates, updates, completes, assigns and soft-deletes TODOs. Enforces business rules (title, due date, statuses, priorities), optimistic concurrency and audit fields. |
+| Filter & Search Service | Domain | Paginated TODO listing with filters by status, priority, assignee and due date, and title/description search, scoped to the user's permissions. |
+| Dashboard Service | Domain | Computes Open, In Progress, Completed and Overdue counts and the High/Critical list for the permitted scope. |
+| Team & User Service | Domain | Maintains user profiles, roles and team membership, supplies the assignable user list and the team view for Team Leads, and supports administrator user management. |
+| Audit Service | Domain | Writes append-only audit entries for TODO changes, authorization denials and administrative actions. |
+| Persistence / Repository Layer | Persistence | Parameterized data access via ORM, transactions, version checks and soft-delete filtering. |
+| PostgreSQL Primary and Replica | Data | Stores users, teams, TODOs and audit log with referential integrity and indexes, and replicates to a standby. |
+| Backup & WAL Archive Storage | Backup & DR | Holds encrypted full backups and continuous WAL archive for point-in-time recovery, with restricted access. |
+| Secrets & Configuration Store | Security & Configuration | Supplies credentials and externalized configuration to application instances at runtime. |
+| Logging, Metrics & Alerting | Operations | Collects redacted structured logs with correlation IDs, request failure and latency metrics, health status, and sends alerts on service failures. |
+
+## NFR coverage
+
+| Category | Approach | Decisions | Sources |
+|---|---|---|---|
+| Security | Mandatory SSO authentication (OIDC) before any protected function. Server-side role-based and object-level authorization with centralized policy. HTTPS/TLS everywhere, secrets kept out of source code, local password hashing with Argon2id/bcrypt if local accounts are used, protection against injection, XSS and broken access control, and an auditable log of administrative actions. | AD-03, AD-04, AD-10, AD-14 | [XATA_TODO_NFR-006] [XATA_TODO_NFR-014] [XATA_TODO_BRD-012] |
+| Performance | Performance budgets for page/API, create/update, search/filter (≤2 s p95) and dashboard (≤3 s p95). Indexed relational queries, pagination, aggregate dashboard queries, connection pooling and stateless horizontal scale-out for at least 500 concurrent users. Verified by load tests on 100,000+ records. | AD-01, AD-06, AD-07, AD-11 | [XATA_TODO_NFR-003] [XATA_TODO_NFR-005] [XATA_TODO_NFR-016] |
+| Availability | At least two load-balanced instances with health checks, automatic restart and rolling deployments, a database standby with failover, recovery within 30 minutes, availability monitoring against 99.5%, and 24-hour advance notice of planned maintenance. | AD-12, AD-15, AD-01 | [XATA_TODO_NFR-004] [XATA_TODO_NFR-011] |
+| Data Integrity | UUID identifiers, server-side validation of required fields and business rules, optimistic concurrency with 409 conflicts instead of silent overwrites, consistent UTC server timestamps, foreign keys between TODOs and users, soft delete with retention by XATA policy and a TODO audit trail. | AD-05, AD-09, AD-10, AD-06 | [XATA_TODO_NFR-007] [XATA_TODO_BRD-012] [XATA_TODO_BRD-008-B] |
+| Backup & Recovery | Continuous WAL archiving plus scheduled full backups to encrypted, access-restricted storage (RPO ≤15 min). Documented, periodically tested restoration procedure and dependency list (RTO ≤30 min). | AD-13, AD-12 | [XATA_TODO_NFR-012] [XATA_TODO_NFR-015] |
+| Usability | Minimal-step create/update/complete flow, responsive layout for desktop and tablet, understandable validation messages, and visually distinct status, priority and overdue indicators. Actions are discoverable and permitted actions are shown in the UI. | AD-02, AD-05 | [XATA_TODO_NFR-008] [XATA_TODO_NFR-013] |
+| Maintainability | Layered modular code that separates presentation, business logic and persistence. Documented, versioned OpenAPI APIs, externalized configuration, unit tests for critical business rules, and logging that excludes sensitive data. | AD-16, AD-15, AD-14 | [XATA_TODO_NFR-010] [XATA_TODO_NFR-013] |
+| Accessibility | Target WCAG 2.1 AA where practical: keyboard-operable core workflows, labelled form controls, sufficient contrast and readable text, with status never conveyed by colour alone. | AD-02 | [XATA_TODO_NFR-009] [XATA_TODO_NFR-008] |
+| Advanced observability | Structured logs with correlation IDs, health endpoints, request failure and latency metrics and configurable alerts in release 1. Distributed tracing and richer dashboards are deferred as a Should. | AD-15 | [XATA_TODO_NFR-011] [XATA_TODO_NFR-017] |
+
+## Assumptions
+
+- Authentication is via an enterprise OIDC IdP (SSO). If XATA has none, local accounts with secure hashing are used (open question on login method).
+- Authorization default: Employees manage TODOs they created or are assigned. Team Leads also manage TODOs of their team members and assign within the team. Administrators manage users and configuration. XATA to confirm the full permission matrix.
+- Any active user the actor is authorized to assign to (an Employee's own scope, a Team Lead's team members) is an 'authorized user' for assignment. Whether Employees may assign to others is pending XATA confirmation.
+- A due date earlier than the creation date is rejected unless an explicit override flag is set by a Team Lead or Administrator (pending XATA confirmation).
+- High/Critical priority TODOs are shown on the dashboard in addition to the four counts.
+- Deletion is soft with purge according to XATA's retention policy, whose period is not yet provided. TODO changes are retained in an audit log.
+- Completed status is reversible by authorized users (reopen). A TODO without an assignee belongs to its creator.
+- Supported browsers are current Chrome and Edge, as the NFR lists 'major enterprise browsers such as Chrome and Edge'.
+- XATA supplies the user list and team structure. A user may belong to more than one team.
+- Single enterprise environment for release 1. The 'core lifecycle' without administrator help means create, assign, update, complete and delete TODOs (self-service). Administrators are only needed for user and team maintenance.
+- Administrator 'basic platform configuration' is limited in release 1 to user, role and team maintenance. There is no matching business requirement.
+- Agreed maintenance windows and the backup schedule will be agreed with XATA. Initial volume is at least 100,000 TODOs.
+
+## Risks
+
+- The authorization matrix (authorized to manage, assign, reassign, delete) is unresolved. Wrong assumptions can cause rework in authorization and the UI, and risk breaking BR-014.
+- The identity mechanism is unconfirmed. If there is no OIDC-capable IdP, local account management adds security and support scope.
+- Team and user data quality depends on XATA supplying and maintaining it. Stale membership will give wrong team views and wrong permissions.
+- The retention policy and soft/hard delete expectations are unknown. They could force a later change to deletion and purge design and to audit-log growth.
+- RPO 15 minutes and RTO 30 minutes need database replication, WAL archiving and rehearsed restores. Cost and operational readiness in a single environment may be a constraint.
+- 99.5% availability with a single environment depends on XATA infrastructure redundancy (hosts, zones, database failover) that is not specified.
+- Live aggregate dashboard queries and full-text search may miss targets as data grows well beyond 100,000 records. This needs early load testing, with caching or a search engine as a fallback.
+- The due-date override rule and the reopen-completed behaviour are not defined. Dashboard counts and the Completed status invariant could be affected.
+- The Administrator's configuration and user-management functions are undefined and have no business requirement, so scope creep is possible.
+- Observability tooling is not specified by XATA. Alerting and monitoring choices must be agreed with XATA IT.

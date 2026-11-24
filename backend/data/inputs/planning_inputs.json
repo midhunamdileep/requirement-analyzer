@@ -1,0 +1,24 @@
+{
+  "start_date": "2027-01-04",
+  "target_go_live": null,
+  "available_people": [
+    {
+      "role": "Technical Architect",
+      "skills": ["Java", "Spring Boot", "PostgreSQL", "AWS S3, SQS, CLoudwatch, Lambda, SNS"],
+      "availability_percent": 100
+    },
+    {
+      "role": "Backend Developer",
+      "skills": ["Java", "Spring Boot", "PostgreSQL"],
+      "availability_percent": 100
+    },
+    {
+      "role": "Frontend Developer",
+      "skills": ["Angular", "TypeScript"],
+      "availability_percent": 50
+    }
+  ],
+  "constraints": [
+    "Replace this example with real values, then save the file as planning_inputs.json in this folder."
+  ]
+}

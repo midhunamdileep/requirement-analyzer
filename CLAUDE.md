@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-NEXUS is planned as a multi-agent proposal platform (Functional Analyst, Solution Architect, Project Manager) that turns a BRD + NFR into a functional document, architecture diagram, and tech-stack recommendation. **Only the first milestone exists**: ingesting a Word BRD, chunking it, embedding the chunks locally, and retrieving them from Neo4j Aura via vector search. The agents and orchestration are TODO items in `README.md`, which also holds the full step-by-step setup (Aura, vector index Cypher, troubleshooting).
+requirement-analyzer (codename NEXUS) is planned as a multi-agent proposal platform (Functional Analyst, Solution Architect, Project Manager) that turns a BRD + NFR into a functional document, architecture diagram, and tech-stack recommendation. **Only the first milestone exists**: ingesting a Word BRD, chunking it, embedding the chunks locally, and retrieving them from Neo4j Aura via vector search. The agents and orchestration are TODO items in `README.md`, which also holds the full step-by-step setup (Aura, vector index Cypher, troubleshooting).
 
 There are no tests, linter, or build system.
 

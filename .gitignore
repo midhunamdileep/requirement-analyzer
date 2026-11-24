@@ -31,3 +31,6 @@ backend/data/runs/
 # Editors / IDEs
 .vscode/
 .idea/
+
+# Active BRD/NFR selection made in the UI
+backend/data/active_documents.json

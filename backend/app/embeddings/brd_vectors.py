@@ -43,8 +43,12 @@ def embed_chunk(model: SentenceTransformer, chunk: dict) -> list[float]:
 
 
 def upload(model: SentenceTransformer) -> None:
+    upload_chunks(model, read_chunks())
+
+
+def upload_chunks(model: SentenceTransformer, chunks: list[dict]) -> int:
     rows = []
-    for chunk in read_chunks():
+    for chunk in chunks:
         print(f"Embedding {chunk['chunk_id']}")
         rows.append({**chunk, "embedding": embed_chunk(model, chunk)})
 
@@ -67,6 +71,7 @@ def upload(model: SentenceTransformer) -> None:
             database_=database_name(),
         )
     print(f"Stored {records[0]['stored']} chunks in Neo4j")
+    return records[0]["stored"]
 
 
 def search(model: SentenceTransformer, question: str) -> None:

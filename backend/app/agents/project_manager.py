@@ -15,6 +15,7 @@ from app.agents.common import cite, generate_with_repair, get_client, with_feedb
 from app.agents.functional_analyst import FunctionalDocument, parse_requirements
 from app.agents.solution_architect import ArchitectureDesign
 from app.rag.retrieval import connect, fetch_chunks
+from app.sources import brd_source, nfr_source, project_title
 
 
 BRD_SOURCE = "XATA_TODO_BRD.docx"
@@ -360,7 +361,7 @@ def render_markdown(plan: ProjectPlan, problems: list[str], start: date, start_i
     total_fte = sum(r.fte for r in resourcing.roles)
     end_week = max((e for _, e in schedule.values()), default=0)
 
-    lines = ["# Project Plan: XATA TODO Management Platform", ""]
+    lines = [f"# Project Plan: {project_title()}", ""]
     lines += [
         "> Durations, team size and dates are **estimates**"
         + (" informed by the supplied planning inputs." if has_inputs else "; no planning inputs were supplied.")
@@ -482,8 +483,8 @@ def main() -> None:
     inputs = load_inputs()
 
     with connect() as driver:
-        brd_chunks = fetch_chunks(driver, BRD_SOURCE)
-        nfr_chunks = fetch_chunks(driver, NFR_SOURCE)
+        brd_chunks = fetch_chunks(driver, brd_source())
+        nfr_chunks = fetch_chunks(driver, nfr_source())
     if not brd_chunks or not nfr_chunks:
         raise SystemExit("BRD or NFR chunks missing from Neo4j. Run the upload first.")
 

@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.agents.common import cite, generate_with_repair, get_client, with_feedback
 from app.agents.functional_analyst import FunctionalDocument, parse_requirements
 from app.rag.retrieval import connect, fetch_chunks
+from app.sources import brd_source, nfr_source, project_title
 
 
 BRD_SOURCE = "XATA_TODO_BRD.docx"
@@ -75,7 +76,7 @@ SYSTEM_PROMPT = (
     "requirements (NFR) provided, produce structured design decisions, a technology stack "
     "with rationale and assumptions, and the components and data flows of the architecture. "
     "Use only the facts provided and state every other fact as an assumption. Cite the "
-    "chunk IDs (for example XATA_TODO_NFR-003) behind each decision. Every Must requirement "
+    "chunk IDs (for example <document>-003; use the IDs shown in the prompt) behind each decision. Every Must requirement "
     "and every numbered NFR target in the checklist must be referenced by at least one "
     "decision, and every Must NFR category must appear in nfr_coverage under its exact name. "
     "Every component must take part in at least one flow. Do not write diagram syntax; the "
@@ -219,7 +220,7 @@ def cell(text: str) -> str:
 
 
 def render_markdown(design: ArchitectureDesign, problems: list[str]) -> str:
-    lines = ["# Solution Architecture: XATA TODO Management Platform", "", "## Design decisions", ""]
+    lines = [f"# Solution Architecture: {project_title()}", "", "## Design decisions", ""]
     for d in design.decisions:
         lines += [
             f"### {d.id}: {d.title} {cite(d.citations)}",
@@ -279,8 +280,8 @@ def main() -> None:
     doc = FunctionalDocument.model_validate_json(functional_path.read_text(encoding="utf-8"))
 
     with connect() as driver:
-        brd_chunks = fetch_chunks(driver, BRD_SOURCE)
-        nfr_chunks = fetch_chunks(driver, NFR_SOURCE)
+        brd_chunks = fetch_chunks(driver, brd_source())
+        nfr_chunks = fetch_chunks(driver, nfr_source())
     if not brd_chunks or not nfr_chunks:
         raise SystemExit("BRD or NFR chunks missing from Neo4j. Run the upload first.")
 

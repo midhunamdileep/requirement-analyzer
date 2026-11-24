@@ -132,6 +132,15 @@ def chunk_document(path: Path, counter: TokenCounter) -> list[dict]:
     return chunks
 
 
+def ingest_file(path: Path, counter: TokenCounter | None = None) -> tuple[Path, list[dict]]:
+    """Chunk any .docx and write data/output/<stem>_chunks.json (used for uploaded documents)."""
+    chunks = chunk_document(path, counter or TokenCounter())
+    output = BACKEND_DIR / "data" / "output" / f"{path.stem}_chunks.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(chunks, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output, chunks
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Chunk a Word document by heading, splitting sections that exceed the embedding model's token limit.")
     parser.add_argument("document", nargs="?", default="brd", choices=DOCUMENTS)

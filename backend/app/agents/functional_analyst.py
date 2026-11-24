@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.agents.common import cite, generate_with_repair, get_client, with_feedback
 from app.rag.retrieval import connect, fetch_chunks
+from app.sources import brd_source, project_title
 
 
 BRD_SOURCE = "XATA_TODO_BRD.docx"
@@ -66,7 +67,7 @@ class FunctionalDocument(BaseModel):
 SYSTEM_PROMPT = (
     "You are a functional analyst. You turn a business requirements document (BRD) into a "
     "functional document. Use only the BRD sections provided; never invent facts. Every item "
-    "must cite the chunk IDs (for example XATA_TODO_BRD-012) of the sections it comes from. "
+    "must cite the chunk IDs (for example <document>-012; use the IDs shown in the prompt) of the sections it comes from. "
     "Cover every requirement in the checklist, and every Must requirement must also have at "
     "least one acceptance criterion written as Given/When/Then. Record genuine gaps, "
     "ambiguities and contradictions in the BRD as open questions rather than resolving them "
@@ -150,7 +151,7 @@ def generate(client, chunks: list[dict], requirements: list[dict], feedback: lis
 def render_markdown(doc: FunctionalDocument, requirements: list[dict], problems: list[str]) -> str:
     covered = {r.id for r in doc.requirements}
     tested = {req_id for a in doc.acceptance_criteria for req_id in a.requirement_ids}
-    lines = ["# Functional Document: XATA TODO Management Platform", ""]
+    lines = [f"# Functional Document: {project_title()}", ""]
 
     lines += ["## Mandatory requirement coverage", "", "| ID | Priority | Described | Acceptance criterion |", "|---|---|---|---|"]
     for r in requirements:
@@ -203,10 +204,11 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Show the checklist and prompt size without calling Claude.")
     args = parser.parse_args()
 
+    source = brd_source()
     with connect() as driver:
-        chunks = fetch_chunks(driver, BRD_SOURCE)
+        chunks = fetch_chunks(driver, source)
     if not chunks:
-        raise SystemExit(f"No chunks found for {BRD_SOURCE}. Run the upload first.")
+        raise SystemExit(f"No chunks found for {source}. Run the upload first.")
 
     requirements = parse_requirements(chunks)
     must = [r["id"] for r in requirements if r["priority"] == "Must"]

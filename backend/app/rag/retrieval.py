@@ -54,9 +54,12 @@ def fetch_chunks(driver: Driver, source: str) -> list[dict]:
 
 
 def search_chunks(
-    driver: Driver, model: SentenceTransformer, question: str, limit: int = 10
+    driver: Driver, model: SentenceTransformer, question: str, limit: int = 10,
+    sources: list[str] | None = None,
 ) -> list[dict]:
+    """Vector search; `sources` restricts results to those documents (the index spans all of them)."""
     vector = embed(model, question, label="Search question")
+    fetch_limit = limit * 5 if sources else limit
     records, _, _ = driver.execute_query(
         """
         CYPHER 25
@@ -71,7 +74,10 @@ def search_chunks(
         ORDER BY score DESC
         """,
         embedding=vector,
-        limit=limit,
+        limit=fetch_limit,
         database_=database_name(),
     )
-    return [record.data() for record in records]
+    rows = [record.data() for record in records]
+    if sources:
+        rows = [r for r in rows if r["source"] in sources]
+    return rows[:limit]

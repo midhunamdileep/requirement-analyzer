@@ -208,6 +208,28 @@ Every pass is saved as an immutable version in `backend/data/runs/<run_id>/v<N>/
 
 `approve` is the human gate. It re-hashes the version from disk and refuses if any file changed. You review the files, then type the first 8 characters of the **bundle hash** (or pass `--confirm`). Versions with open findings also need `--accept-open-issues`. Approval writes `approval.json` for that exact version, so a newer version is never approved by inheritance. `status` lists versions and flags unapproved or modified ones.
 
+Each version also contains a `handoff.json` (included in the bundle hash): which agent passed which artifact (file, SHA-256, counts) to the next, any user guidance or findings sent back for rework, and per-agent run stats (duration, tokens, repair rounds, event log).
+
+**How the loop and the evals work.** There are three nested loops: a schema retry when Claude's tool call is malformed, a draft → verify → repair loop inside each agent (up to 2 repair rounds), and the orchestrator's rework rounds described above. The evals are deterministic code checks (valid citations, requirement and NFR coverage, acceptance criteria for every Must requirement, dependency and schedule checks, plus the cross-agent check) and then the human approval. There is no LLM judge or quality score.
+
+## 13. Use the web UI
+
+```text
+streamlit run backend/app/ui.py
+```
+
+It opens at <http://localhost:8501>. Run it from the repo root with the virtual environment active. `backend/.env` needs the Neo4j credentials and `ANTHROPIC_API_KEY`; the sidebar shows whether they were found.
+
+| Tab | What it does |
+|---|---|
+| Documents | Upload a BRD and an NFR (`.docx`). Each is chunked, embedded and stored in Neo4j Aura, with chunks saved to `backend/data/output/<name>_chunks.json`. Then choose the active BRD/NFR pair (saved in `backend/data/active_documents.json`); the sample XATA documents stay available. |
+| Run | Start date, rework rounds, dry run, planning inputs (go-live, people, constraints) and optional guidance for each agent. The run happens in the background, with a live, per-agent log (Claude calls, tokens, verification, repair rounds). |
+| Review | Findings, integrity status and the functional document, architecture, project plan and traceability for any run and version. The **Handoffs** tab shows `handoff.json` as a sequence diagram and tables. |
+| Approve | One-click approval of the selected version. The version's hash is still checked against the files on disk, and open findings must be accepted first. |
+| Ask | Ask questions about the active BRD and NFR, with cited chunk IDs checked against the retrieved passages. |
+
+Uploaded documents must follow the sample structure: Word Heading styles, a `BR-001`-style requirements table with `ID | Requirement | Priority`, and `NFR-<CAT>-<n>` target tables plus a `Category | Priority` table in the NFR. The headings of the generated documents take the project name from the `RFP:` line on the BRD cover page. Demo documents for a fictional leave-management project are in `docs/demo/` (`NOVA_LEAVE_BRD.docx`, `NOVA_LEAVE_NFR.docx`, and `nova_planning_inputs.json` for the planning inputs). Documents are stored in Neo4j Aura (cloud), so upload only sample or approved material.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -228,4 +250,5 @@ Reference documentation: [Connect to Aura](https://neo4j.com/docs/aura/getting-s
 - [x] Build the **Solution Architect**. Use the functional draft and NFRs to produce structured design decisions, a Mermaid architecture diagram, and a technology stack with rationale and assumptions.
 - [x] Build the **Project Manager**. Review the proposal (objectives, scope, assumptions, constraints, dependencies, timelines), determine skills, team size, availability and onboarding, and prepare phases, milestones, releases, and a delivery roadmap. (Replaces the Proposal Reviewer.)
 - [x] Orchestrate the three roles (Functional Analyst, Solution Architect, Project Manager) in Python. Persist draft versions, route each agent's verification problems for rework, and require human approval of the exact version containing all three deliverables.
+- [x] Add a Streamlit UI for the orchestrator: upload BRD/NFR, run with inputs and live per-agent logs, review (including `handoff.json`), approve and ask questions.
 - [ ] Add GraphRAG for amendment impact analysis and expose an existing tool through MCP as separate extensions.

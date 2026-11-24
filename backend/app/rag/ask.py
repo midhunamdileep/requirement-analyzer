@@ -11,7 +11,7 @@ SYSTEM_PROMPT = (
     "You answer questions about a business requirements document (BRD) and a "
     "non-functional requirements document (NFR). Use only the passages provided. "
     "Cite every claim with the chunk ID of its passage in square brackets, for "
-    "example [XATA_TODO_BRD-007]. If the passages do not answer the question, "
+    "example [<document>-007]. If the passages do not answer the question, "
     "say 'Not stated in the documents.' and cite nothing."
 )
 
@@ -49,6 +49,20 @@ def ask(question: str, chunks: list[dict], client=None) -> str:
         messages=[{"role": "user", "content": build_prompt(question, chunks)}],
     )
     return "".join(block.text for block in response.content if block.type == "text")
+
+
+def answer_question(question: str, model=None, limit: int = 5, sources: list[str] | None = None,
+                    dry_run: bool = False) -> dict:
+    """Retrieve, answer and verify citations. Returns chunks, answer (None on dry run), cited, invalid."""
+    model = model or load_model()
+    with connect() as driver:
+        chunks = search_chunks(driver, model, question, limit=limit, sources=sources)
+    if not chunks or dry_run:
+        return {"chunks": chunks, "answer": None, "cited": [], "invalid": [],
+                "prompt": build_prompt(question, chunks) if chunks else ""}
+    answer = ask(question, chunks)
+    cited, invalid = verify_citations(answer, chunks)
+    return {"chunks": chunks, "answer": answer, "cited": cited, "invalid": invalid, "prompt": ""}
 
 
 def run(question: str, dry_run: bool = False, limit: int = 5) -> None:

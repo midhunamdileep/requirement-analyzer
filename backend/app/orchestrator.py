@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -16,8 +17,9 @@ from pydantic import ValidationError
 from app.agents import functional_analyst as fa
 from app.agents import project_manager as pm
 from app.agents import solution_architect as sa
-from app.agents.common import DEFAULT_MODEL, get_client
+from app.agents.common import DEFAULT_MODEL, get_client, start_logging
 from app.rag.retrieval import connect, fetch_chunks
+from app.sources import brd_source, nfr_source
 
 
 RUNS_DIR = BACKEND_DIR / "data" / "runs"
@@ -177,12 +179,60 @@ def verify_version(version_dir: Path) -> tuple[dict, list[str]]:
     return manifest, problems
 
 
+# ---------------------------------------------------------------- handoff
+
+
+def build_handoff(run_id, number, created, files, artifacts, ran, agent_runs, sent, first_pass,
+                  brd_count, nfr_count, req_count, target_count, category_count, has_inputs, previous_findings) -> dict:
+    """Who passed what to whom in this pass. Artifact hashes are those of the files written for this version."""
+    def digest(name: str) -> str:
+        return sha256(files[name].encode("utf-8"))
+
+    fa_doc, design, plan = artifacts["fa"], artifacts["sa"], artifacts["pm"]
+    status = lambda key: "ran" if key in ran else "reused from an earlier pass"  # noqa: E731
+    handoffs = []
+
+    def add(**entry):
+        handoffs.append({"seq": len(handoffs) + 1, **entry})
+
+    # Guidance (first pass) or findings routed back by the orchestrator (later passes) go in first.
+    for owner, items in sent.items():
+        add(**{"from": "User guidance" if first_pass else "Orchestrator", "to": AGENT_NAMES[owner],
+               "kind": "feedback", "items": items,
+               "findings": [f for f in previous_findings if f["owner"] == owner] if not first_pass else []})
+
+    add(**{"from": "Documents (Neo4j)", "to": AGENT_NAMES["fa"], "kind": "source", "status": status("fa"),
+           "payload": {"BRD sections": brd_count, "requirements parsed": req_count}})
+    add(**{"from": AGENT_NAMES["fa"], "to": AGENT_NAMES["sa"], "kind": "artifact", "status": status("fa"),
+           "artifact": "functional_document.json", "sha256": digest("functional_document.json"),
+           "summary": {"requirements": len(fa_doc.requirements), "acceptance_criteria": len(fa_doc.acceptance_criteria),
+                       "business_rules": len(fa_doc.business_rules), "open_questions": len(fa_doc.open_questions)},
+           "also_received": {"BRD sections": brd_count, "NFR sections": nfr_count,
+                             "NFR targets": target_count, "NFR categories": category_count},
+           "consumer_status": status("sa")})
+    add(**{"from": AGENT_NAMES["sa"], "to": AGENT_NAMES["pm"], "kind": "artifact", "status": status("sa"),
+           "artifact": "architecture.json", "sha256": digest("architecture.json"),
+           "summary": {"decisions": len(design.decisions), "tech_stack_layers": len(design.tech_stack),
+                       "components": len(design.components), "flows": len(design.flows), "risks": len(design.risks)},
+           "also_received": {"functional_document.json": digest("functional_document.json"),
+                             "planning_inputs": has_inputs, "BRD/NFR sections": brd_count + nfr_count},
+           "consumer_status": status("pm")})
+    add(**{"from": AGENT_NAMES["pm"], "to": "Orchestrator", "kind": "artifact", "status": status("pm"),
+           "artifact": "project_plan.json", "sha256": digest("project_plan.json"),
+           "summary": {"phases": len(plan.roadmap.phases), "releases": len(plan.roadmap.releases),
+                       "roles": len(plan.resourcing.roles), "deferred": len(plan.roadmap.deferred)}})
+    return {"run_id": run_id, "version": number, "created_at": created, "handoffs": handoffs, "agent_runs": agent_runs}
+
+
 # ---------------------------------------------------------------- pipeline
 
 
 def run_pipeline(client, brd_chunks: list[dict], nfr_chunks: list[dict], inputs: dict | None,
-                 start: date, start_is_given: bool, run_dir: Path | None, max_rounds: int = 2) -> list[dict]:
-    """Run the three agents, cross-check, route findings back for rework, and persist each pass."""
+                 start: date, start_is_given: bool, run_dir: Path | None, max_rounds: int = 2,
+                 progress=print, initial_feedback: dict[str, list[str]] | None = None) -> list[dict]:
+    """Run the three agents, cross-check, route findings back for rework, and persist each pass.
+
+    `initial_feedback` ({"fa"|"sa"|"pm": [guidance, ...]}) is given to the agents on the first pass."""
     chunks = brd_chunks + nfr_chunks
     requirements = fa.parse_requirements(brd_chunks)
     must_ids = [r["id"] for r in requirements if r["priority"] == "Must"]
@@ -192,29 +242,65 @@ def run_pipeline(client, brd_chunks: list[dict], nfr_chunks: list[dict], inputs:
     artifacts: dict[str, object] = {}
     problems: dict[str, list[str]] = {"fa": [], "sa": [], "pm": []}
     feedback: dict[str, list[str]] = {"fa": [], "sa": [], "pm": []}
+    for owner, items in (initial_feedback or {}).items():
+        feedback[owner] = [i for i in items if i.strip()]
     dirty = {"fa", "sa", "pm"}
     manifests = []
+
+    ever_ran: set[str] = set()
+    last_findings: list[dict] = []
 
     for round_number in range(max_rounds + 1):
         sent = {k: list(v) for k, v in feedback.items() if v}
         ran = []
+        agent_runs: list[dict] = []
+        number = round_number + 1
+
+        def run_agent(key: str, call):
+            """Run one agent with its events collected, and record how it ran."""
+            if key not in ever_ran:
+                trigger = "initial"
+            else:
+                trigger = "rework" if feedback[key] else "upstream_changed"
+            progress(f"[v{number}] {AGENT_NAMES[key]} starting ({trigger.replace('_', ' ')})"
+                     + (f"; {len(feedback[key])} feedback item(s) received" if feedback[key] else ""))
+            events = start_logging(AGENT_NAMES[key], progress)
+            began = time.monotonic()
+            result, found = call()
+            seconds = time.monotonic() - began
+            done = [e for e in events if e["kind"] == "llm_done"]
+            agent_runs.append({
+                "agent": AGENT_NAMES[key],
+                "trigger": trigger,
+                "feedback_received": list(feedback[key]),
+                "duration_s": round(seconds, 1),
+                "llm_calls": len(done),
+                "tokens_in": sum(e["tokens_in"] for e in done),
+                "tokens_out": sum(e["tokens_out"] for e in done),
+                "repair_rounds": sum(1 for e in events if e["kind"] == "repair_round"),
+                "problems_remaining": list(found),
+                "events": events,
+            })
+            progress(f"[v{number}] {AGENT_NAMES[key]} done in {seconds:.0f}s; "
+                     f"{len(found)} problem(s) remaining")
+            ever_ran.add(key)
+            ran.append(key)
+            return result, found
+
         if "fa" in dirty:
-            print(f"[v{round_number + 1}] Functional Analyst")
-            artifacts["fa"], problems["fa"] = fa.generate(client, brd_chunks, requirements, feedback["fa"])
+            artifacts["fa"], problems["fa"] = run_agent(
+                "fa", lambda: fa.generate(client, brd_chunks, requirements, feedback["fa"]))
             dirty |= {"sa", "pm"}
-            ran.append("fa")
         if "sa" in dirty:
-            print(f"[v{round_number + 1}] Solution Architect")
-            artifacts["sa"], problems["sa"] = sa.generate(client, artifacts["fa"], chunks, targets, categories, must_ids, feedback["sa"])
+            artifacts["sa"], problems["sa"] = run_agent(
+                "sa", lambda: sa.generate(client, artifacts["fa"], chunks, targets, categories, must_ids, feedback["sa"]))
             dirty |= {"pm"}
-            ran.append("sa")
         if "pm" in dirty:
-            print(f"[v{round_number + 1}] Project Manager")
-            artifacts["pm"], problems["pm"] = pm.generate(client, chunks, artifacts["fa"], artifacts["sa"], requirements, inputs, feedback["pm"])
-            ran.append("pm")
+            artifacts["pm"], problems["pm"] = run_agent(
+                "pm", lambda: pm.generate(client, chunks, artifacts["fa"], artifacts["sa"], requirements, inputs, feedback["pm"]))
 
         findings = collect_findings(problems, artifacts["pm"])
-        number = round_number + 1
+        progress(f"[v{number}] orchestrator checks: {len(findings)} open finding(s)")
         if run_dir is not None:
             files = {
                 "functional_document.json": artifacts["fa"].model_dump_json(indent=2),
@@ -225,9 +311,14 @@ def run_pipeline(client, brd_chunks: list[dict], nfr_chunks: list[dict], inputs:
                 "project_plan.md": pm.render_markdown(artifacts["pm"], problems["pm"], start, start_is_given, inputs is not None),
                 "traceability.md": traceability_markdown(requirements, artifacts["fa"], artifacts["sa"], artifacts["pm"], targets),
             }
+            created = datetime.now().isoformat(timespec="seconds")
+            files["handoff.json"] = json.dumps(build_handoff(
+                run_dir.name, number, created, files, artifacts, ran, agent_runs, sent, round_number == 0,
+                len(brd_chunks), len(nfr_chunks), len(requirements), len(targets), len(categories),
+                inputs is not None, last_findings), indent=2)
             manifest = write_version(run_dir, number, files, {
                 "run_id": run_dir.name,
-                "created_at": datetime.now().isoformat(timespec="seconds"),
+                "created_at": created,
                 "model": os.getenv("ANTHROPIC_MODEL", DEFAULT_MODEL),
                 "agents_run": [AGENT_NAMES[a] for a in ran],
                 "agent_problems": problems,
@@ -237,11 +328,12 @@ def run_pipeline(client, brd_chunks: list[dict], nfr_chunks: list[dict], inputs:
         else:
             manifest = {"version": number, "findings": findings, "agents_run": [AGENT_NAMES[a] for a in ran]}
         manifests.append(manifest)
-        print(f"[v{number}] saved; {len(findings)} open finding(s)")
+        progress(f"[v{number}] saved; {len(findings)} open finding(s)")
 
         if not findings or round_number == max_rounds:
             break
 
+        last_findings = findings
         feedback = {k: [] for k in feedback}
         for f in findings:
             feedback[f["owner"]].append(f"{f['problem']}. Correction: {f['correction']}")
@@ -255,39 +347,51 @@ def run_pipeline(client, brd_chunks: list[dict], nfr_chunks: list[dict], inputs:
 
 def load_context() -> tuple[list[dict], list[dict], dict | None]:
     with connect() as driver:
-        brd = fetch_chunks(driver, fa.BRD_SOURCE)
-        nfr = fetch_chunks(driver, sa.NFR_SOURCE)
+        brd = fetch_chunks(driver, brd_source())
+        nfr = fetch_chunks(driver, nfr_source())
     if not brd or not nfr:
         raise SystemExit("BRD or NFR chunks missing from Neo4j. Run the upload first.")
     return brd, nfr, pm.load_inputs()
 
 
-def cmd_run(args: argparse.Namespace) -> None:
-    brd, nfr, inputs = load_context()
-    start_text = args.start_date or (inputs or {}).get("start_date")
+def start_run(max_rounds: int = 2, dry_run: bool = False, start_date: str | None = None,
+              inputs: dict | None = None, initial_feedback: dict[str, list[str]] | None = None,
+              progress=print) -> list[dict] | None:
+    """Load the active documents and run the pipeline. Returns the manifests (None on a dry run).
+
+    `inputs` overrides the planning inputs file when given."""
+    brd, nfr, file_inputs = load_context()
+    inputs = inputs if inputs is not None else file_inputs
+    start_text = start_date or (inputs or {}).get("start_date")
     start = date.fromisoformat(start_text) if start_text else pm.next_monday()
 
-    print(f"Loaded {len(brd)} BRD and {len(nfr)} NFR sections. Planning inputs: {'found' if inputs else 'none'}.")
-    print("Order: Functional Analyst -> Solution Architect -> Project Manager; "
-          f"up to {args.max_rounds} rework round(s) when findings are routed back to the owning agent.")
-    if args.dry_run:
-        print("Dry run: nothing was sent to Claude and no files were written.")
-        return
+    progress(f"Loaded {len(brd)} BRD and {len(nfr)} NFR sections. Planning inputs: {'found' if inputs else 'none'}.")
+    progress("Order: Functional Analyst -> Solution Architect -> Project Manager; "
+             f"up to {max_rounds} rework round(s) when findings are routed back to the owning agent.")
+    if dry_run:
+        progress("Dry run: nothing was sent to Claude and no files were written.")
+        return None
 
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = RUNS_DIR / run_id
-    manifests = run_pipeline(get_client(), brd, nfr, inputs, start, bool(start_text), run_dir, args.max_rounds)
+    manifests = run_pipeline(get_client(), brd, nfr, inputs, start, bool(start_text), run_dir, max_rounds,
+                             progress=progress, initial_feedback=initial_feedback)
 
     last = manifests[-1]
-    print(f"\nRun {run_id}: {len(manifests)} version(s) in {run_dir}")
-    print(f"Latest version v{last['version']}, bundle hash {last['bundle_hash']}")
+    progress(f"\nRun {run_id}: {len(manifests)} version(s) in {run_dir}")
+    progress(f"Latest version v{last['version']}, bundle hash {last['bundle_hash']}")
     if last["findings"]:
-        print(f"{len(last['findings'])} finding(s) remain open:")
+        progress(f"{len(last['findings'])} finding(s) remain open:")
         for f in last["findings"]:
-            print(f"- [{f['owner']}] {f['problem']}")
-    print(f"\nReview {run_dir / ('v' + str(last['version']))}, then approve with:")
-    print(f"  python backend/app/orchestrator.py approve {run_id} --version {last['version']}"
-          + (" --accept-open-issues" if last["findings"] else ""))
+            progress(f"- [{f['owner']}] {f['problem']}")
+    progress(f"\nReview {run_dir / ('v' + str(last['version']))}, then approve with:")
+    progress(f"  python backend/app/orchestrator.py approve {run_id} --version {last['version']}"
+             + (" --accept-open-issues" if last["findings"] else ""))
+    return manifests
+
+
+def cmd_run(args: argparse.Namespace) -> None:
+    start_run(args.max_rounds, args.dry_run, args.start_date)
 
 
 def run_dirs() -> list[Path]:
@@ -320,16 +424,48 @@ def cmd_status(args: argparse.Namespace) -> None:
                   f"{'APPROVED' if approved else 'not approved'}{'  INTEGRITY PROBLEM: ' + '; '.join(problems) if problems else ''}")
 
 
-def cmd_approve(args: argparse.Namespace) -> None:
-    run_dir = RUNS_DIR / args.run_id
+def locate_version(run_id: str, version: int | None) -> tuple[Path, Path, list[Path]]:
+    run_dir = RUNS_DIR / run_id
     if not run_dir.is_dir():
-        raise SystemExit(f"Run {args.run_id} not found.")
+        raise ValueError(f"Run {run_id} not found.")
     versions = versions_of(run_dir)
     if not versions:
-        raise SystemExit("This run has no versions.")
-    version_dir = run_dir / f"v{args.version}" if args.version else versions[-1]
+        raise ValueError("This run has no versions.")
+    version_dir = run_dir / f"v{version}" if version else versions[-1]
     if not version_dir.is_dir():
-        raise SystemExit(f"Version {version_dir.name} not found.")
+        raise ValueError(f"Version {version_dir.name} not found.")
+    return run_dir, version_dir, versions
+
+
+def write_approval(run_id: str, version: int | None, confirm: str, accept_open_issues: bool) -> dict:
+    """Approve one exact version; raises ValueError (nothing written) if any check fails."""
+    run_dir, version_dir, _ = locate_version(run_id, version)
+    manifest, problems = verify_version(version_dir)
+    if problems:
+        raise ValueError("Refusing to approve; the version does not match its manifest: " + "; ".join(problems))
+    findings = manifest["findings"]
+    if findings and not accept_open_issues:
+        raise ValueError("This version has open findings. Fix them in a new run, or accept the open issues.")
+    if confirm != manifest["bundle_hash"][:8]:
+        raise ValueError("Confirmation does not match the bundle hash; nothing was approved.")
+
+    approval = {
+        "run_id": run_id,
+        "version": manifest["version"],
+        "bundle_hash": manifest["bundle_hash"],
+        "approved_by": getpass.getuser(),
+        "approved_at": datetime.now().isoformat(timespec="seconds"),
+        "open_issues_accepted": len(findings) if findings else 0,
+    }
+    (run_dir / "approval.json").write_text(json.dumps(approval, indent=2), encoding="utf-8")
+    return approval
+
+
+def cmd_approve(args: argparse.Namespace) -> None:
+    try:
+        run_dir, version_dir, versions = locate_version(args.run_id, args.version)
+    except ValueError as error:
+        raise SystemExit(str(error))
 
     manifest, problems = verify_version(version_dir)
     if problems:
@@ -353,18 +489,10 @@ def cmd_approve(args: argparse.Namespace) -> None:
         if not sys.stdin.isatty():
             raise SystemExit(f"Not interactive. Re-run with --confirm {expected} after reviewing the files.")
         typed = input(f"Type the first 8 characters of the bundle hash ({expected}) to approve this exact version: ").strip()
-    if typed != expected:
-        raise SystemExit("Confirmation does not match the bundle hash; nothing was approved.")
-
-    approval = {
-        "run_id": args.run_id,
-        "version": manifest["version"],
-        "bundle_hash": manifest["bundle_hash"],
-        "approved_by": getpass.getuser(),
-        "approved_at": datetime.now().isoformat(timespec="seconds"),
-        "open_issues_accepted": len(findings) if findings else 0,
-    }
-    (run_dir / "approval.json").write_text(json.dumps(approval, indent=2), encoding="utf-8")
+    try:
+        approval = write_approval(args.run_id, manifest["version"], typed, args.accept_open_issues)
+    except ValueError as error:
+        raise SystemExit(str(error))
     print(f"Approved v{manifest['version']} ({manifest['bundle_hash'][:8]}) as {approval['approved_by']}.")
 
 

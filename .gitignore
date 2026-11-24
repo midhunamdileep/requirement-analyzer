@@ -25,6 +25,9 @@ backend/.env
 .DS_Store
 Thumbs.db
 
+# Generated orchestrator runs (may contain proposal content)
+backend/data/runs/
+
 # Editors / IDEs
 .vscode/
 .idea/

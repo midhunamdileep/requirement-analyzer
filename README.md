@@ -45,7 +45,9 @@ To reproduce the Word extraction and chunking:
 
    `read_brd.py` prints paragraphs, heading styles, and table rows in document order. Compare a heading, a paragraph, and a requirement row against Word. `chunk_brd.py` groups the content by heading and saves `backend/data/output/brd_chunks.json`. Each record has `chunk_id`, `source`, `heading`, and `text`.
 
-3. Inspect section **6. Business Requirements**. If regeneration produces a single `XATA_TODO_BRD-008` record, replace it with two records with the same `source` and `heading`. Use `XATA_TODO_BRD-008-A` for BR-001 through BR-008 and `XATA_TODO_BRD-008-B` for BR-009 through BR-015. Repeat the `ID | Requirement | Priority` header in both and preserve the original rows. The original section took 316 tokens against the model's 256-token limit. Regenerating JSON can overwrite this manual split.
+3. Check the split of section **6. Business Requirements**. It takes 316 tokens against the model's 256-token limit, so `chunk_brd.py` splits it automatically into `XATA_TODO_BRD-008-A` and `XATA_TODO_BRD-008-B` at a table-row boundary (BR-001 through BR-007, then BR-008 through BR-015) and repeats the `ID | Requirement | Priority` header in both. Sections that fit keep a plain `-NNN` ID. The script counts tokens the same way the embedding step does and prints each chunk's count. No manual edit is needed.
+
+   Chunk the NFR the same way with `python app/ingestion/chunk_brd.py nfr`, which writes `nfr_chunks.json`.
 
 ## 3. Preview an embedding
 
@@ -137,6 +139,75 @@ Two more queries reproduce the retrieval experiments:
 
 If your checkout uses `LIMIT 3` inside the Cypher `SEARCH` clause, temporarily use `LIMIT 10` to inspect more candidates. These ranks are observations from the sample run. Check whether the evidence appears and answers the question.
 
+## 8. Ask a question with Claude
+
+```text
+python backend/app/embeddings/brd_vectors.py ask "What roles does the app require?" --dry-run
+python backend/app/embeddings/brd_vectors.py ask "What roles does the app require?"
+```
+
+`ask` retrieves the top five chunks with the same search as step 7, sends them to Claude, and checks every `[CHUNK_ID]` citation in the answer against the retrieved chunks. Cited IDs that were not retrieved, or an answer with no citations, print a warning. `--dry-run` shows the retrieved passages and the exact prompt without calling Claude, so it needs no API key.
+
+For a live answer add `ANTHROPIC_API_KEY` to `backend/.env`. `ANTHROPIC_MODEL` is optional and defaults to `claude-sonnet-5-5`. The retrieval code lives in `backend/app/rag/retrieval.py` for reuse by the agents.
+
+## 9. Generate the functional document
+
+```text
+python backend/app/agents/functional_analyst.py --dry-run
+python backend/app/agents/functional_analyst.py
+```
+
+The Functional Analyst loads **every** BRD chunk from Aura (not just search hits) and parses the requirement table in code to build a checklist of requirement IDs and priorities. Claude returns a structured document (requirements, business rules, workflows, Given/When/Then acceptance criteria, open questions, assumptions), each item citing chunk IDs. A deterministic check then confirms that all citations are real chunks, every requirement is described, and every `Must` requirement has an acceptance criterion. Failures go back to Claude for up to two repair rounds, and anything still failing is listed in the output.
+
+It writes `backend/data/output/functional_document.md` and `functional_document.json`. `--dry-run` prints the checklist and prompt size without calling Claude. The model comes from `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`).
+
+## 10. Generate the architecture
+
+Run the Functional Analyst first, because the Architect reads its `functional_document.json`.
+
+```text
+python backend/app/agents/solution_architect.py --dry-run
+python backend/app/agents/solution_architect.py
+```
+
+The Solution Architect combines the functional document with every BRD and NFR chunk from Aura. Code parses the numbered NFR targets (`NFR-PERF-001` and so on) and the category priorities from the NFR priority section. Claude returns design decisions with rationale and alternatives, a technology stack with assumptions, components and data flows, NFR coverage per category, assumptions, and risks. The Mermaid diagram is generated in code from the components and flows, so its syntax is always valid.
+
+A deterministic check confirms that citations are real chunks, every `Must` requirement and numbered NFR target is referenced by a decision, every `Must` NFR category is covered, and every flow endpoint and component is consistent. Failures go back to Claude for up to two repair rounds, and anything still failing is listed in the output.
+
+It writes `backend/data/output/architecture.md` (including the fenced `mermaid` diagram) and `architecture.json`.
+
+## 11. Generate the project plan
+
+Run the Functional Analyst and the Solution Architect first, because the Project Manager reads their JSON output.
+
+```text
+python backend/app/agents/project_manager.py --dry-run
+python backend/app/agents/project_manager.py [--start-date 2027-01-11]
+```
+
+The Project Manager does three jobs. It reviews the BRD and NFR for objectives, scope, assumptions, constraints, stakeholders, dependencies and any stated timelines, with chunk citations. It determines roles, skills, FTE, onboarding and availability assumptions from the architecture's tech-stack layers. It prepares phases, milestones, releases and a roadmap. Claude supplies phase durations and dependencies only; the code computes the week schedule, critical path, staffing per phase and the Mermaid Gantt chart.
+
+The documents give no start date, deadline, budget, team or availability, so without more input every duration, FTE and date is an **estimate** and the missing facts are listed under *Information gaps*. To supply real facts, copy `backend/data/inputs/planning_inputs.example.json` to `planning_inputs.json` and edit it (start date, go-live, available people with skills and availability, constraints). Those values are then treated as facts. `--start-date` overrides the start date; with neither, the Gantt chart uses a nominal next-Monday placeholder.
+
+A code check confirms that citations are real chunks, every `Must` requirement is in a release (nothing is silently dropped), the phase graph has no cycles, every external dependency is resolved by an onboarding item or phase, and every tech-stack layer has a role. Failures go back to Claude for up to two repair rounds and any left are listed in the output.
+
+It writes `backend/data/output/project_plan.md` and `project_plan.json`.
+
+## 12. Run everything with the orchestrator
+
+```text
+python backend/app/orchestrator.py run --dry-run
+python backend/app/orchestrator.py run
+python backend/app/orchestrator.py status
+python backend/app/orchestrator.py approve <run_id> [--version N]
+```
+
+`run` fetches the BRD and NFR once, then runs the Functional Analyst, Solution Architect and Project Manager in that order. After each pass, code gathers findings: any problems an agent could not resolve itself, plus cross-agent checks (for example, a requirement placed in a release that no phase delivers in time). Each finding is routed back as feedback to the agent that owns the artifact. Only that agent and the agents downstream of it re-run, for up to `--max-rounds` (default 2) rework rounds. Claude never decides the order; Python does.
+
+Every pass is saved as an immutable version in `backend/data/runs/<run_id>/v<N>/`: each agent's JSON and Markdown, a `traceability.md` matrix (requirement → acceptance criteria → decisions → phases → releases, plus NFR targets → decisions) and a `manifest.json` with SHA-256 hashes, the findings, and the feedback that was sent. The runs folder is git-ignored because it can hold proposal content.
+
+`approve` is the human gate. It re-hashes the version from disk and refuses if any file changed. You review the files, then type the first 8 characters of the **bundle hash** (or pass `--confirm`). Versions with open findings also need `--accept-open-issues`. Approval writes `approval.json` for that exact version, so a newer version is never approved by inheritance. `status` lists versions and flags unapproved or modified ones.
+
 ## Troubleshooting
 
 | Symptom | What to check |
@@ -151,10 +222,10 @@ Reference documentation: [Connect to Aura](https://neo4j.com/docs/aura/getting-s
 
 ## TODO
 
-- [ ] Complete RAG with an `ask` command. Extract reusable retrieval from `search`, send the question and retrieved passages to Claude, and verify citations against chunk IDs.
-- [ ] Ingest the NFR alongside the BRD and preserve each source's identity. Automate token-aware splitting, including repeated headers for long tables.
-- [ ] Build the **Functional Analyst**. Process all relevant BRD sections, track mandatory requirement IDs, and produce the functional document with cited rules, workflows, acceptance criteria, and open questions.
-- [ ] Build the **Solution Architect**. Use the functional draft and NFRs to produce structured design decisions, a Mermaid architecture diagram, and a technology stack with rationale and assumptions.
-- [ ] Build the **Proposal Reviewer**. Let it request evidence through a bounded search tool and return findings that identify the affected artifact, requirement, and correction.
-- [ ] Orchestrate the three roles in Python. Persist draft versions, route findings for rework, and require human approval of the exact version containing all three deliverables.
+- [x] Complete RAG with an `ask` command. Extract reusable retrieval from `search`, send the question and retrieved passages to Claude, and verify citations against chunk IDs. (Live Claude call untested until an API key is added.)
+- [x] Ingest the NFR alongside the BRD and preserve each source's identity. Automate token-aware splitting, including repeated headers for long tables.
+- [x] Build the **Functional Analyst**. Process all relevant BRD sections, track mandatory requirement IDs, and produce the functional document with cited rules, workflows, acceptance criteria, and open questions.
+- [x] Build the **Solution Architect**. Use the functional draft and NFRs to produce structured design decisions, a Mermaid architecture diagram, and a technology stack with rationale and assumptions.
+- [x] Build the **Project Manager**. Review the proposal (objectives, scope, assumptions, constraints, dependencies, timelines), determine skills, team size, availability and onboarding, and prepare phases, milestones, releases, and a delivery roadmap. (Replaces the Proposal Reviewer.)
+- [x] Orchestrate the three roles (Functional Analyst, Solution Architect, Project Manager) in Python. Persist draft versions, route each agent's verification problems for rework, and require human approval of the exact version containing all three deliverables.
 - [ ] Add GraphRAG for amendment impact analysis and expose an existing tool through MCP as separate extensions.

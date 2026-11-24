@@ -1,13 +1,13 @@
-# NEXUS
-NEXUS is an agentic platform where specialized AI agents collaborate like a real proposal team—analyzing the RFP, deriving requirements, designing solutions, preparing the proposal, reviewing it, and maintaining traceability back to the source.
+# requirement-analyzer
+requirement-analyzer (codename NEXUS) is an agentic platform where specialized AI agents collaborate like a real proposal team—analyzing the RFP, deriving requirements, designing solutions, preparing the proposal, reviewing it, and maintaining traceability back to the source.
 
-NEXUS will turn a business requirements document (BRD) and non-functional requirements (NFRs) into a functional document, a solution architecture diagram, and a technology stack recommendation for human review.
+It will turn a business requirements document (BRD) and non-functional requirements (NFRs) into a functional document, a solution architecture diagram, and a technology stack recommendation for human review.
 
 The current milestone is **BRD ingestion and vector retrieval**. Python reads a Word BRD, groups the text into chunks, and uses MiniLM to embed them on the local CPU. Neo4j Aura stores the chunks and vectors and returns ranked passages for a question. The current commands run without Claude credentials, Ollama, or a hosted embedding API. Aura is cloud-hosted, so upload only sample or approved material.
 
 ## 1. Clone and install
 
-Clone the NEXUS repository and open a terminal at its root, the folder containing `backend/`. Use a Python version supported by PyTorch on your machine. Python 3.12 is a starting point for a fresh environment.
+Clone the requirement-analyzer repository and open a terminal at its root, the folder containing `backend/`. Use a Python version supported by PyTorch on your machine. Python 3.12 is a starting point for a fresh environment.
 
 **Windows**
 
